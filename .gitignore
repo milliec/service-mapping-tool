@@ -31,3 +31,9 @@ yarn-error.log*
 # Build output
 dist/
 build/
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+
+# Claude Code worktrees
+.claude/
