@@ -37,8 +37,7 @@ import {
   createApiContractFromRequirement,
   createUiScaffoldFromRequirementAndApi,
 } from '@/lib/traceability/downstream';
-import type { ReviewableCluster } from '@/lib/clustering/types';
-import { DEFAULT_LANES, L1_MACRO_LANES, L1_MACRO_LANE_KEYS, L1_INSIGHT_LANE_KEYS, L2_INSIGHT_LANE_KEYS, L3_LANE_KEYS } from '@/lib/lane-definitions';
+import { DEFAULT_LANES, L1_MACRO_LANES, L1_MACRO_LANE_KEYS, L3_LANE_KEYS } from '@/lib/lane-definitions';
 import { createSeedBlueprint, createExampleOstBlueprint, createDefraEnvironmentalOstBlueprint } from '@/lib/seed-data';
 import { isOstPrimarySnapshot } from '@/lib/ost-primary-snapshot';
 import { getLanePrefix } from '@/lib/traceability/registry';
@@ -737,20 +736,6 @@ interface BlueprintStore extends BlueprintState {
   strategicAlignmentOpen: boolean;
   setStrategicAlignmentOpen: (open: boolean) => void;
 
-  // Insight multi-selection (pain_point + user_need, ephemeral — not persisted)
-  selectedInsightIds: string[];
-  toggleInsightSelected: (cardId: string) => void;
-  selectAllInsights: () => void;
-  selectAllInsightsInStage: (stageId: string) => void;
-  clearInsightSelection: () => void;
-
-  // Cluster review state (ephemeral — not persisted)
-  clusterReviewOpen: boolean;
-  pendingClusters: ReviewableCluster[];
-  openClusterReview: (clusters: ReviewableCluster[]) => void;
-  closeClusterReview: () => void;
-  updatePendingCluster: (clusterId: string, patch: Partial<Pick<ReviewableCluster, 'editedTitle' | 'editedSummary' | 'includedCardIds' | 'reviewStatus'>>) => void;
-
   // Opportunities panel (ephemeral)
   opportunitiesPanelOpen: boolean;
   setOpportunitiesPanelOpen: (open: boolean) => void;
@@ -1060,9 +1045,6 @@ export const useBlueprintStore = create<BlueprintStore>((set, get) => ({
   selectedJourneySpanId: null,
   selectedPolicyReformSpanId: null,
   selectedProductTeamSpanId: null,
-  selectedInsightIds: [],
-  clusterReviewOpen: false,
-  pendingClusters: [],
   opportunitiesPanelOpen: false,
   contributionPathOppId: null,
   ostPanelOpen: false,
@@ -2111,7 +2093,6 @@ export const useBlueprintStore = create<BlueprintStore>((set, get) => ({
         selectedPolicyReformSpanId: null,
         selectedProductTeamSpanId: null,
         selectedCardId: null,
-        selectedInsightIds: [],
       };
     });
   },
@@ -2143,7 +2124,6 @@ export const useBlueprintStore = create<BlueprintStore>((set, get) => ({
         selectedPolicyReformSpanId: null,
         selectedProductTeamSpanId: null,
         selectedCardId: null,
-        selectedInsightIds: [],
       };
     });
   },
@@ -3281,52 +3261,6 @@ export const useBlueprintStore = create<BlueprintStore>((set, get) => ({
 
   // Strategic alignment overlay (ephemeral)
   setStrategicAlignmentOpen: (open) => set((s) => ({ ...s, strategicAlignmentOpen: open })),
-
-  // Insight multi-selection (ephemeral)
-  toggleInsightSelected: (cardId: string) => {
-    set((s) => {
-      const ids = s.selectedInsightIds;
-      const next = ids.includes(cardId) ? ids.filter((id) => id !== cardId) : [...ids, cardId];
-      return { ...s, selectedInsightIds: next };
-    });
-  },
-
-  selectAllInsights: () => {
-    set((s) => {
-      const keys = s.lanes.some((l) => L1_MACRO_LANE_KEYS.has(l.key))
-        ? L1_INSIGHT_LANE_KEYS
-        : L2_INSIGHT_LANE_KEYS;
-      const ids = s.cards.filter((c) => keys.has(c.laneKey)).map((c) => c.id);
-      return { ...s, selectedInsightIds: ids };
-    });
-  },
-
-  selectAllInsightsInStage: (stageId: string) => {
-    set((s) => {
-      const keys = s.lanes.some((l) => L1_MACRO_LANE_KEYS.has(l.key))
-        ? L1_INSIGHT_LANE_KEYS
-        : L2_INSIGHT_LANE_KEYS;
-      const ids = s.cards
-        .filter((c) => keys.has(c.laneKey) && c.stageId === stageId)
-        .map((c) => c.id);
-      return { ...s, selectedInsightIds: [...new Set([...s.selectedInsightIds, ...ids])] };
-    });
-  },
-
-  clearInsightSelection: () => set((s) => ({ ...s, selectedInsightIds: [] })),
-
-  // Cluster review (ephemeral)
-  openClusterReview: (clusters) => set((s) => ({ ...s, clusterReviewOpen: true, pendingClusters: clusters })),
-  closeClusterReview: () => set((s) => ({ ...s, clusterReviewOpen: false, pendingClusters: [] })),
-
-  updatePendingCluster: (clusterId, patch) => {
-    set((s) => ({
-      ...s,
-      pendingClusters: s.pendingClusters.map((c) =>
-        c.clusterId === clusterId ? { ...c, ...patch } : c,
-      ),
-    }));
-  },
 
   // Opportunities panel (ephemeral)
   setOpportunitiesPanelOpen: (open) => set((s) => ({ ...s, opportunitiesPanelOpen: open })),

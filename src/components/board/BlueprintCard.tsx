@@ -9,7 +9,6 @@ import { useBlueprintStore } from '@/store/blueprint-store';
 import { cn } from '@/lib/utils';
 import { getCardColorTokens } from './LaneLabel';
 import { CardTagEditor, getReusableTagSuggestions } from './CardTagEditor';
-import { L1_MACRO_LANE_KEYS, L1_INSIGHT_LANE_KEYS, L2_INSIGHT_LANE_KEYS } from '@/lib/lane-definitions';
 import { stripRollupsForCardDisplay, stripTraceabilityForDisplay } from '@/lib/traceability/display';
 
 interface BlueprintCardProps {
@@ -28,17 +27,6 @@ export function BlueprintCard({ card, isDragOverlay }: BlueprintCardProps) {
   const selectedCardId = useBlueprintStore((s) => s.selectedCardId);
   const readOnly = useBlueprintStore((s) => s.readOnly);
   const isSelected = selectedCardId === card.id;
-
-  // Insight multi-selection — lane-set-aware
-  const selectedInsightIds = useBlueprintStore((s) => s.selectedInsightIds);
-  const toggleInsightSelected = useBlueprintStore((s) => s.toggleInsightSelected);
-  const lanes = useBlueprintStore((s) => s.lanes);
-  const insightLaneKeys = useMemo(
-    () => (lanes.some((l) => L1_MACRO_LANE_KEYS.has(l.key)) ? L1_INSIGHT_LANE_KEYS : L2_INSIGHT_LANE_KEYS),
-    [lanes],
-  );
-  const isInsightCard = insightLaneKeys.has(card.laneKey);
-  const isInsightSelected = isInsightCard && selectedInsightIds.includes(card.id);
 
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(card.title);
@@ -191,33 +179,9 @@ export function BlueprintCard({ card, isDragOverlay }: BlueprintCardProps) {
         laneToken.bg,
         laneToken.border,
         isSelected && 'ring-2 ring-blue-400 ring-offset-1',
-        isInsightSelected && 'ring-2 ring-amber-400 ring-offset-1',
         isDragOverlay && 'rotate-1 shadow-lg',
       )}
     >
-      {/* Insight multi-select checkbox (pain_point + user_need) — visible on hover or when selected */}
-      {isInsightCard && !isDragOverlay && !readOnly && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleInsightSelected(card.id);
-          }}
-          aria-label={isInsightSelected ? 'Deselect insight' : 'Select insight for clustering'}
-          aria-pressed={isInsightSelected}
-          className={cn(
-            'absolute left-1.5 top-1.5 z-10 flex h-4 w-4 items-center justify-center rounded border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400',
-            isInsightSelected
-              ? 'border-amber-500 bg-amber-500 opacity-100'
-              : 'border-neutral-300 bg-white opacity-0 group-hover:opacity-100',
-          )}
-        >
-          {isInsightSelected && (
-            <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 10 10" fill="none" aria-hidden>
-              <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )}
-        </button>
-      )}
       <div className="flex items-start gap-1.5">
         {!readOnly && (
           <button

@@ -46,7 +46,6 @@ import {
   extractFromPastedText,
   type ExtractedRow,
 } from '@/lib/import/extract';
-import { type AiOutputRow } from '@/lib/import/normalize';
 import { MockImportMappingService } from '@/lib/import/mock-mapping-service';
 import type { MappedRow, RowRecordType, ReviewStatus } from '@/lib/import/mapping-types';
 import { commitMappedRows } from '@/lib/import/commit';
@@ -59,7 +58,7 @@ import { cn } from '@/lib/utils';
 // Types
 // ---------------------------------------------------------------------------
 
-type AiImportStep = 'upload' | 'sheet-select' | 'extracting' | 'pdf-extracting' | 'mapping' | 'review' | 'done';
+type AiImportStep = 'upload' | 'sheet-select' | 'extracting' | 'mapping' | 'review' | 'done';
 type InputMode = 'file' | 'paste';
 type RowFilter = 'all' | 'cards' | 'needs_attention' | 'accepted' | 'rejected';
 
@@ -477,47 +476,6 @@ export function AiImportDialog({ open, onClose }: AiImportDialogProps) {
         return;
       }
 
-      if (ext === 'pdf') {
-        setStep('pdf-extracting');
-        try {
-          const formData = new FormData();
-          formData.append('file', file);
-          const res = await fetch('/api/parse-pdf', { method: 'POST', body: formData });
-          const data = await res.json() as { rows?: AiOutputRow[]; error?: string };
-          if (!res.ok || data.error) {
-            setMappingErrors([data.error ?? 'Failed to process PDF']);
-            setMappedRows([]);
-            setStep('review');
-            return;
-          }
-          const pdfRows: ExtractedRow[] = (data.rows ?? []).map((r, i) => ({
-            sourceType: 'pdf_extracted' as const,
-            sourceFileName: file.name,
-            sourceSheetOrPage: 'PDF',
-            sourceRowNumber: r.sourceRowNumber ?? i + 1,
-            extractedHeaders: ['record_type', 'stage', 'step', 'lane_key', 'card_title', 'card_body', 'tags', 'confidence'],
-            extractedCells: {
-              record_type: r.record_type ?? '',
-              stage: r.stage ?? '',
-              step: r.step ?? '',
-              lane_key: r.lane_key ?? '',
-              card_title: r.card_title ?? '',
-              card_body: r.card_body ?? '',
-              tags: (r.tags ?? []).join(', '),
-              confidence: String(r.confidence ?? ''),
-            },
-            rawText: [r.stage, r.step, r.lane_key, r.card_title, r.card_body].filter(Boolean).join('\t'),
-          }));
-          setExtractedRows(pdfRows);
-          await runMapping(pdfRows);
-        } catch (err) {
-          setMappingErrors([err instanceof Error ? err.message : 'Failed to process PDF']);
-          setMappedRows([]);
-          setStep('review');
-        }
-        return;
-      }
-
       if (ext === 'xlsx' || ext === 'xls') {
         const buffer = await file.arrayBuffer();
         const { sheets: sheetList, workbook: wb } = parseXlsx(buffer, file.name);
@@ -544,7 +502,7 @@ export function AiImportDialog({ open, onClose }: AiImportDialogProps) {
       }
 
       setMappingErrors([
-        `Unsupported file type: .${ext ?? 'unknown'}. Use CSV, XLSX, PDF, or paste text below.`,
+        `Unsupported file type: .${ext ?? 'unknown'}. Use CSV, XLSX, or paste text below.`,
       ]);
       setMappedRows([]);
       setStep('review');
@@ -727,11 +685,11 @@ export function AiImportDialog({ open, onClose }: AiImportDialogProps) {
                     browse
                   </button>
                 </p>
-                <p className="text-[12px] text-neutral-400">CSV, XLSX or PDF</p>
+                <p className="text-[12px] text-neutral-400">CSV or XLSX</p>
                 <input
                   ref={fileRef}
                   type="file"
-                  accept=".csv,.xlsx,.xls,.pdf"
+                  accept=".csv,.xlsx,.xls"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) processFile(file);
@@ -795,18 +753,6 @@ export function AiImportDialog({ open, onClose }: AiImportDialogProps) {
           <div className="flex flex-col items-center gap-3 py-12">
             <Loader2 className="h-8 w-8 animate-spin text-neutral-400" />
             <p className="text-[14px] font-medium text-neutral-700">Reading source data…</p>
-          </div>
-        )}
-
-        {/* ── PDF extracting ─────────────────────────────────────────────── */}
-        {step === 'pdf-extracting' && (
-          <div className="flex flex-col items-center gap-3 py-12">
-            <div className="relative">
-              <Loader2 className="h-8 w-8 animate-spin text-neutral-300" />
-              <Sparkles className="absolute inset-0 m-auto h-4 w-4 text-violet-500" />
-            </div>
-            <p className="text-[14px] font-medium text-neutral-700">Analysing PDF with AI…</p>
-            <p className="text-[12px] text-neutral-400">This may take a moment</p>
           </div>
         )}
 

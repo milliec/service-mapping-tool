@@ -14,7 +14,7 @@ import {
   type DragOverEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { ArrowUp, Hand, Maximize2, Minimize2, Film, ChevronDown, ChevronUp, Plus, Sparkles } from 'lucide-react';
+import { ArrowUp, Hand, Maximize2, Minimize2, Film, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { useBlueprintStore } from '@/store/blueprint-store';
 import { type Card, type LaneKey, type StoryboardImage } from '@/lib/types';
 import { LaneLabel } from './LaneLabel';
@@ -29,7 +29,6 @@ import { JourneySpanDetailPanel } from './JourneySpanDetailPanel';
 import { CreateJourneyDialog } from './CreateJourneyDialog';
 import { CreatePolicyReformDialog } from './CreatePolicyReformDialog';
 import { CreateProductTeamDialog } from './CreateProductTeamDialog';
-import { ClusterReviewPanel } from './ClusterReviewPanel';
 import { OpportunitiesPanel } from './OpportunitiesPanel';
 import { JourneySpanRow } from './JourneySpanRow';
 import { PolicyReformRow } from './PolicyReformRow';
@@ -38,14 +37,7 @@ import { PolicyReformDetailPanel } from './PolicyReformDetailPanel';
 import { ProductTeamDetailPanel } from './ProductTeamDetailPanel';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { DEFAULT_LANES, L2_LANE_KEYS, L2_LANE_TITLE_OVERRIDES, L3_LANE_KEYS, L3_LANE_TITLE_OVERRIDES, L1_MACRO_LANE_KEYS, L1_INSIGHT_LANE_KEYS, L2_INSIGHT_LANE_KEYS, L3_INSIGHT_LANE_KEYS } from '@/lib/lane-definitions';
-import { MockOpportunityClusteringService } from '@/lib/clustering/mock-service';
-import { OpenAIClusteringService } from '@/lib/clustering/openai-service';
-import type { ClusterInput, ReviewableCluster } from '@/lib/clustering/types';
-import { MockStoryboardService } from '@/lib/storyboard/mock-service';
-import { OpenAIStoryboardService } from '@/lib/storyboard/openai-service';
-import type { StoryboardPromptContext } from '@/lib/storyboard/service';
-import { getLaneTitle } from '@/lib/lane-definitions';
+import { DEFAULT_LANES, L2_LANE_KEYS, L2_LANE_TITLE_OVERRIDES, L3_LANE_KEYS, L3_LANE_TITLE_OVERRIDES, L1_MACRO_LANE_KEYS } from '@/lib/lane-definitions';
 import { BOARD_STEP_WIDTH } from '@/lib/board-layout';
 import { getActiveBlueprintJourneyLevel } from '@/lib/blueprint-levels';
 
@@ -211,68 +203,11 @@ export function Board() {
   const toggleStoryboardCollapsed = useBlueprintStore((s) => s.toggleStoryboardCollapsed);
   const selectCard = useBlueprintStore((s) => s.selectCard);
 
-  // Insight selection & clustering (pain_point + user_need)
-  const selectedInsightIds = useBlueprintStore((s) => s.selectedInsightIds);
-  const clearInsightSelection = useBlueprintStore((s) => s.clearInsightSelection);
-  const selectAllInsights = useBlueprintStore((s) => s.selectAllInsights);
-  const selectAllInsightsInStage = useBlueprintStore((s) => s.selectAllInsightsInStage);
-  const openClusterReview = useBlueprintStore((s) => s.openClusterReview);
-  const clusterReviewOpen = useBlueprintStore((s) => s.clusterReviewOpen);
   const opportunitiesPanelOpen = useBlueprintStore((s) => s.opportunitiesPanelOpen);
 
-  const [isGeneratingClusters, setIsGeneratingClusters] = useState(false);
-  const [clusterError, setClusterError] = useState<string | null>(null);
   const [createJourneyOpen, setCreateJourneyOpen] = useState(false);
   const [createPolicyReformOpen, setCreatePolicyReformOpen] = useState(false);
   const [createProductTeamOpen, setCreateProductTeamOpen] = useState(false);
-
-  // AI storyboard generation state
-  const [isGeneratingStoryboard, setIsGeneratingStoryboard] = useState(false);
-  const [storyboardGenError, setStoryboardGenError] = useState<string | null>(null);
-  const [storyboardGenProgress, setStoryboardGenProgress] = useState<{ current: number; total: number } | null>(null);
-  const [generatingStepId, setGeneratingStepId] = useState<string | null>(null);
-
-  const handleGenerateClusters = useCallback(async () => {
-    if (selectedInsightIds.length === 0) return;
-    setIsGeneratingClusters(true);
-    setClusterError(null);
-    try {
-      const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
-      const service = apiKey
-        ? new OpenAIClusteringService(apiKey)
-        : new MockOpportunityClusteringService();
-      const inputs: ClusterInput[] = selectedInsightIds.flatMap((cardId) => {
-        const card = cards.find((c) => c.id === cardId);
-        if (!card) return [];
-        if (!insightLaneKeys.has(card.laneKey)) return [];
-        const stage = stages.find((s) => s.id === card.stageId);
-        const step = steps.find((s) => s.id === card.stepId);
-        return [{
-          cardId: card.id,
-          cardTitle: card.title,
-          cardBody: card.body,
-          stageId: card.stageId,
-          stageTitle: stage?.title ?? '',
-          stepId: card.stepId,
-          stepTitle: step?.title ?? '',
-          tags: card.tags,
-          sourceType: card.laneKey as ClusterInput['sourceType'],
-        }];
-      });
-      const result = await service.generateClusters(inputs);
-      const reviewable: ReviewableCluster[] = result.clusters.map((c) => ({
-        ...c,
-        editedTitle: c.proposedTitle,
-        editedSummary: c.proposedSummary,
-        reviewStatus: 'pending',
-      }));
-      openClusterReview(reviewable);
-    } catch (err) {
-      setClusterError(err instanceof Error ? err.message : 'Clustering failed. Please try again.');
-    } finally {
-      setIsGeneratingClusters(false);
-    }
-  }, [selectedInsightIds, cards, stages, steps, openClusterReview]);
 
   const [activeCard, setActiveCard] = useState<Card | null>(null);
   const [panMode, setPanMode] = useState(false);
@@ -459,12 +394,6 @@ export function Board() {
     [lanes],
   );
 
-  const insightLaneKeys = isL1MacroMode
-    ? L1_INSIGHT_LANE_KEYS
-    : isL3Mode
-      ? L3_INSIGHT_LANE_KEYS
-      : L2_INSIGHT_LANE_KEYS;
-
   const effectiveVisibleLanes = useMemo(() => {
     // L3 (Micro) uses the canonical L3 lane order while respecting the user's
     // visibility toggles from the Lanes dropdown.
@@ -571,130 +500,6 @@ export function Board() {
     },
     [isL3Mode, storyboardImagesByStep, addStoryboardImage],
   );
-
-  /**
-   * Resize a base64 PNG (from DALL-E or mock) to a 480x320 JPEG data URL.
-   * Matches the output format of ImageCropModal so storyboard images stay consistent.
-   */
-  const resizeStoryboardImage = useCallback(async (base64Png: string): Promise<string> => {
-    const dataUrl = base64Png.startsWith('data:')
-      ? base64Png
-      : `data:image/png;base64,${base64Png}`;
-    const img = new Image();
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error('Failed to load generated image'));
-      img.src = dataUrl;
-    });
-    const canvas = document.createElement('canvas');
-    canvas.width = 480;
-    canvas.height = 320;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas 2D context not available');
-    ctx.drawImage(img, 0, 0, 480, 320);
-    return canvas.toDataURL('image/jpeg', 0.85);
-  }, []);
-
-  /**
-   * Generate storyboard images.
-   * - If `stepIds` is provided: generate for those steps (adds one image per step).
-   * - If `stepIds` is omitted: bulk — only steps with no storyboard images yet.
-   * Runs sequentially to respect DALL-E rate limits (~5 images/min).
-   * Errors stop the loop but preserve already-generated images.
-   */
-  const handleGenerateStoryboard = useCallback(async (stepIds?: string[]) => {
-    // Collect target steps, in stage/step order
-    const targetSteps: Array<{ stepId: string; stepTitle: string; stageId: string; stageTitle: string }> = [];
-    const filterSet = stepIds ? new Set(stepIds) : null;
-    for (const stage of sortedStages) {
-      const stageSteps = stepsPerStage.get(stage.id) || [];
-      for (const step of stageSteps) {
-        // L3: specific stepIds always run; bulk skips steps that already have any image.
-        // L1/L2: always skip if the step already has an image (one per step).
-        const hasImage = (storyboardImagesByStep.get(step.id)?.length ?? 0) > 0;
-        const include = filterSet
-          ? filterSet.has(step.id) && (isL3Mode || !hasImage)
-          : !hasImage;
-        if (include) {
-          targetSteps.push({
-            stepId: step.id,
-            stepTitle: step.title,
-            stageId: stage.id,
-            stageTitle: stage.title,
-          });
-        }
-      }
-    }
-
-    if (targetSteps.length === 0) {
-      setStoryboardGenError(
-        stepIds
-          ? isL3Mode
-            ? 'No matching steps to generate.'
-            : 'This step already has a storyboard image, or the step was not found.'
-          : 'Every step already has a storyboard image.',
-      );
-      return;
-    }
-
-    const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
-    if (!apiKey) {
-      console.warn(
-        '[storyboard] NEXT_PUBLIC_OPENAI_API_KEY not set — using MockStoryboardService (placeholder images). ' +
-          'Create .env.local with NEXT_PUBLIC_OPENAI_API_KEY=sk-... and restart `npm run dev` to use real DALL-E 3.',
-      );
-    } else {
-      console.log('[storyboard] Using OpenAIStoryboardService (DALL-E 3)');
-    }
-    const service = apiKey
-      ? new OpenAIStoryboardService(apiKey)
-      : new MockStoryboardService();
-
-    const serviceName = rootDocument?.blueprint.serviceName ?? 'service';
-
-    setIsGeneratingStoryboard(true);
-    setStoryboardGenError(null);
-    setStoryboardGenProgress({ current: 0, total: targetSteps.length });
-
-    try {
-      for (let i = 0; i < targetSteps.length; i++) {
-        const target = targetSteps[i];
-        setGeneratingStepId(target.stepId);
-        setStoryboardGenProgress({ current: i + 1, total: targetSteps.length });
-
-        // Gather cards for this step, with lane titles
-        const stepCards = cards
-          .filter((c) => c.stepId === target.stepId)
-          .map((c) => ({
-            laneKey: c.laneKey,
-            laneTitle: getLaneTitle(c.laneKey) ?? c.laneKey,
-            title: c.title,
-            body: c.body,
-          }));
-
-        const context: StoryboardPromptContext = {
-          stepTitle: target.stepTitle,
-          stageTitle: target.stageTitle,
-          serviceName,
-          cards: stepCards,
-          frameIndex: i,
-          totalFrames: targetSteps.length,
-        };
-
-        const base64 = await service.generateImage(context);
-        const resized = await resizeStoryboardImage(base64);
-        addStoryboardImage(target.stepId, resized);
-      }
-    } catch (err) {
-      setStoryboardGenError(
-        err instanceof Error ? err.message : 'Storyboard generation failed. Please try again.',
-      );
-    } finally {
-      setGeneratingStepId(null);
-      setStoryboardGenProgress(null);
-      setIsGeneratingStoryboard(false);
-    }
-  }, [sortedStages, stepsPerStage, storyboardImagesByStep, isL3Mode, rootDocument, cards, addStoryboardImage, resizeStoryboardImage]);
 
   // Sync each lane label height imperatively to match the right panel row.
   // We avoid putting height in JSX style so React never overwrites our DOM changes.
@@ -1022,49 +827,10 @@ export function Board() {
                     </button>
                   </div>
 
-                  {/* AI generation (not offered at L3 micro — manual page/screen only) */}
-                  {!storyboardCollapsed && !isL3Mode && (
-                    <button
-                      type="button"
-                      onClick={() => { void handleGenerateStoryboard(); }}
-                      disabled={isGeneratingStoryboard}
-                      title={isGeneratingStoryboard && storyboardGenProgress
-                        ? `Generating ${storyboardGenProgress.current}/${storyboardGenProgress.total}…`
-                        : 'Generate storyboard images with AI'}
-                      aria-label="Generate storyboard images with AI"
-                      className={cn(
-                        'inline-flex h-7 w-full items-center justify-center gap-1 rounded-lg px-2 text-[11px] font-semibold transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400',
-                        isGeneratingStoryboard
-                          ? 'bg-blue-50 text-blue-500 cursor-not-allowed opacity-100'
-                          : 'bg-white text-blue-600 hover:bg-blue-50 border border-blue-200 opacity-0 group-hover/storyboard:opacity-100 focus-visible:opacity-100',
-                      )}
-                    >
-                      <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
-                      {isGeneratingStoryboard && storyboardGenProgress
-                        ? `Generating ${storyboardGenProgress.current}/${storyboardGenProgress.total}`
-                        : 'Generate with AI'}
-                    </button>
-                  )}
                 </div>
               </div>
             )}
 
-            {/* Storyboard generation error — shown inline below the label */}
-            {storyboardGenError && storyboardVisible && !storyboardCollapsed && (
-              <div className="border-b border-rose-200 bg-rose-50 px-3 py-2">
-                <div className="flex items-start gap-2 text-[11px] text-rose-700">
-                  <span className="flex-1">{storyboardGenError}</span>
-                  <button
-                    type="button"
-                    onClick={() => setStoryboardGenError(null)}
-                    aria-label="Dismiss error"
-                    className="shrink-0 text-rose-500 hover:text-rose-700"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Lane labels — heights mirror right panel lane rows */}
@@ -1318,12 +1084,9 @@ export function Board() {
                             microPageOnly={isL3Mode}
                             allowMultipleImages={isL3Mode}
                             images={storyboardImagesByStep.get(step.id) ?? []}
-                            isGenerating={generatingStepId === step.id}
-                            isAnyGenerating={isGeneratingStoryboard}
                             onAddImage={addStoryboardImageIfAllowed}
                             onUpdateImage={updateStoryboardImage}
                             onRemoveImage={removeStoryboardImage}
-                            onGenerate={isL3Mode ? undefined : (id) => { void handleGenerateStoryboard([id]); }}
                           />
                         </div>
                       ));
@@ -1457,8 +1220,8 @@ export function Board() {
           </div>
         </div>
 
-        {/* Panels: cluster review and opportunities (mutually exclusive with card detail) */}
-        {clusterReviewOpen ? <ClusterReviewPanel /> : opportunitiesPanelOpen ? <OpportunitiesPanel /> : selectedJourneySpanId ? <JourneySpanDetailPanel onOpenJourney={handleOpenJourney} /> : selectedPolicyReformSpanId ? <PolicyReformDetailPanel /> : selectedProductTeamSpanId ? <ProductTeamDetailPanel /> : <CardDetailPanel />}
+        {/* Panels: opportunities (mutually exclusive with card detail) */}
+        {opportunitiesPanelOpen ? <OpportunitiesPanel /> : selectedJourneySpanId ? <JourneySpanDetailPanel onOpenJourney={handleOpenJourney} /> : selectedPolicyReformSpanId ? <PolicyReformDetailPanel /> : selectedProductTeamSpanId ? <ProductTeamDetailPanel /> : <CardDetailPanel />}
 
         <CreateJourneyDialog
           open={createJourneyOpen}
@@ -1467,72 +1230,6 @@ export function Board() {
         />
         <CreatePolicyReformDialog open={createPolicyReformOpen} onClose={() => setCreatePolicyReformOpen(false)} />
         <CreateProductTeamDialog open={createProductTeamOpen} onClose={() => setCreateProductTeamOpen(false)} />
-
-        {/* Floating selection bar — appears when insights are selected.
-            Hidden in read-only mode as a safety net (viewers shouldn't have
-            selected anything anyway, because BlueprintCard disables the
-            insight-selection checkbox). */}
-        {selectedInsightIds.length > 0 && !clusterReviewOpen && !readOnly && (
-          <div
-            data-no-pan
-            data-no-select
-            className="pointer-events-none absolute bottom-20 left-1/2 z-30 -translate-x-1/2"
-          >
-            <div className="pointer-events-auto flex flex-col items-center gap-1">
-              {clusterError && (
-                <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-[12px] text-red-700">
-                  {clusterError}
-                </p>
-              )}
-              <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-white px-4 py-2.5 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
-                <span aria-live="polite" aria-atomic="true" className="text-[13px] font-medium text-neutral-700">
-                  {selectedInsightIds.length} insight{selectedInsightIds.length !== 1 ? 's' : ''} selected
-                </span>
-                <div className="h-4 w-px bg-neutral-200" />
-                {/* Stage-scoped selection */}
-                <select
-                  defaultValue=""
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      selectAllInsightsInStage(e.target.value);
-                      e.target.value = '';
-                    }
-                  }}
-                  aria-label="Add all insights in a stage to selection"
-                  className="rounded-lg border border-neutral-200 bg-white px-2 py-1 text-[12px] text-neutral-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-                >
-                  <option value="" disabled>+ Stage</option>
-                  {sortedStages.map((stage) => (
-                    <option key={stage.id} value={stage.id}>{stage.title}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={selectAllInsights}
-                  className="text-[12px] text-neutral-500 hover:text-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-                  aria-label="Select all insights in the blueprint"
-                >
-                  All
-                </button>
-                <button
-                  onClick={clearInsightSelection}
-                  className="text-[12px] text-neutral-400 hover:text-neutral-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-                  aria-label="Clear insight selection"
-                >
-                  Clear
-                </button>
-                <div className="h-4 w-px bg-neutral-200" />
-                <button
-                  onClick={() => { void handleGenerateClusters(); }}
-                  disabled={isGeneratingClusters}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-amber-600 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-                  aria-label="Generate opportunity clusters from selected insights"
-                >
-                  {isGeneratingClusters ? 'Generating…' : '✦ Generate opportunity clusters'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         <div
           data-no-pan
