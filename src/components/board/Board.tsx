@@ -510,14 +510,17 @@ export function Board() {
   }, [sortedStages, stepsPerStage, isL1MacroMode]);
 
   const showStepHeaders = useMemo(
-    () =>
-      sortedStages.some((stage) => {
+    () => {
+      if (isL2Mode || isL3Mode) return false;
+
+      return sortedStages.some((stage) => {
         const stageSteps = stepsPerStage.get(stage.id) || [];
         if (stageSteps.length !== 1) return true;
         const onlyStep = stageSteps[0];
         return Boolean(onlyStep && onlyStep.title.trim() !== stage.title.trim());
-      }),
-    [sortedStages, stepsPerStage],
+      });
+    },
+    [isL2Mode, isL3Mode, sortedStages, stepsPerStage],
   );
 
   const hasStageDescriptions = useMemo(
