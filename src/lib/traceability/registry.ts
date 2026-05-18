@@ -11,7 +11,6 @@ export const TRACEABILITY_PREFIXES = {
   stage_outcome: 'SO',
   step: 'SS',
   // Swimlane card types (keyed by LaneKey)
-  user_journey: 'UJ',
   actor: 'AC',
   user_action_event: 'UA',
   user_need: 'UN',
@@ -32,7 +31,6 @@ export const TRACEABILITY_PREFIXES = {
   opportunities: 'OPP',
   ideas: 'IDEA',
   // L1 Macro swimlane card types
-  policy_reform: 'PR',
   policy_outcome: 'PO',
   user_outcome: 'UO',
   operational_outcome: 'OO',

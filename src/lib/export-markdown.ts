@@ -8,7 +8,6 @@ import {
 import { getActiveBlueprintJourneyLevel } from './blueprint-levels';
 
 const LANE_SWIMLANE_LABEL: Record<LaneKey, string> = {
-  user_journey: 'user_journey',
   actor: 'actor',
   user_action_event: 'user_action',
   user_need: 'user_need',
@@ -29,11 +28,9 @@ const LANE_SWIMLANE_LABEL: Record<LaneKey, string> = {
   data_output: 'data_out',
   backstage_actor: 'backstage_actor',
   shared_services: 'shared_services',
-  product_teams: 'product_teams',
   opportunities: 'opportunities',
   ideas: 'ideas',
   // L1 Macro lanes
-  policy_reform: 'policy_reform',
   policy_outcome: 'policy_outcome',
   user_outcome: 'user_outcome',
   operational_outcome: 'operational_outcome',
@@ -46,7 +43,6 @@ const LANE_SWIMLANE_LABEL: Record<LaneKey, string> = {
 };
 
 const LANE_ORDER: LaneKey[] = [
-  'user_journey',
   'actor',
   'user_action_event',
   'user_need',
@@ -67,11 +63,9 @@ const LANE_ORDER: LaneKey[] = [
   'data_output',
   'backstage_actor',
   'shared_services',
-  'product_teams',
   'opportunities',
   'ideas',
   // L1 Macro lanes
-  'policy_reform',
   'policy_outcome',
   'user_outcome',
   'operational_outcome',

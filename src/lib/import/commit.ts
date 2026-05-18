@@ -10,7 +10,7 @@
  */
 
 import { v4 as uuid } from 'uuid';
-import type { BlueprintState, Card, LaneKey, ProductTeamSpan, Stage, Step } from '../types';
+import type { BlueprintState, Card, LaneKey, Stage, Step } from '../types';
 import { DEFAULT_LANES, L1_MACRO_LANES, L1_MACRO_LANE_KEYS } from '../lane-definitions';
 import type { MappedRow } from './mapping-types';
 import { resolveRow } from './mapping-types';
@@ -119,14 +119,6 @@ export function commitMappedRows(
   const stageMap = new Map<string, Stage>();
   const stepMap = new Map<string, Step>();
   const cards: Card[] = [];
-  // Buffered span markers — resolved to ProductTeamSpans after all stages/steps exist.
-  const productTeamSpanMarkers: Array<{
-    title: string;
-    startStage: string;
-    startStep: string;
-    endStage: string;
-    endStep: string;
-  }> = [];
 
   // Only process accepted rows (not rejected; pending rows are treated as accepted)
   const includedRows = rows.filter((r) => r.reviewStatus !== 'rejected');
@@ -178,19 +170,7 @@ export function commitMappedRows(
     }
 
     // structure_row rows establish hierarchy only — no card created.
-    // Some structure_rows carry extra markers (e.g. product_team span definitions).
     if (resolved.recordType === 'structure_row') {
-      const spanType = row.sourceRow.extractedCells['span_type']?.trim();
-      if (spanType === 'product_team') {
-        const spanTitle = row.sourceRow.extractedCells['span_title']?.trim() ?? '';
-        const startStage = row.sourceRow.extractedCells['start_stage']?.trim() ?? stageName;
-        const startStep = row.sourceRow.extractedCells['start_step']?.trim() ?? stepName;
-        const endStage = row.sourceRow.extractedCells['end_stage']?.trim() ?? startStage;
-        const endStep = row.sourceRow.extractedCells['end_step']?.trim() ?? startStep;
-        if (spanTitle) {
-          productTeamSpanMarkers.push({ title: spanTitle, startStage, startStep, endStage, endStep });
-        }
-      }
       continue;
     }
 
@@ -262,31 +242,6 @@ export function commitMappedRows(
   const stages = Array.from(stageMap.values()).sort((a, b) => a.order - b.order);
   const steps = Array.from(stepMap.values());
 
-  // Resolve product team span markers into ProductTeamSpan entities.
-  // Look up step IDs by "stage::step" key — the same composite used in stepMap.
-  const productTeamSpans: ProductTeamSpan[] = [];
-  productTeamSpanMarkers.forEach((marker, index) => {
-    const startStep = stepMap.get(`${marker.startStage}::${marker.startStep}`);
-    const endStep = stepMap.get(`${marker.endStage}::${marker.endStep}`) ?? startStep;
-    if (!startStep || !endStep) {
-      warnings.push(
-        `Product team span "${marker.title}": could not resolve start/end step — skipped`,
-      );
-      return;
-    }
-    productTeamSpans.push({
-      id: uuid(),
-      blueprintId: bpId,
-      title: marker.title,
-      description: '',
-      startStepId: startStep.id,
-      endStepId: endStep.id,
-      order: index,
-      createdAt: ts,
-      updatedAt: ts,
-    });
-  });
-
   return {
     state: {
       blueprint: {
@@ -299,9 +254,6 @@ export function commitMappedRows(
       stages,
       steps,
       lanes: (isL1Macro ? L1_MACRO_LANES : DEFAULT_LANES).map((l) => ({ ...l })),
-      journeySpans: [],
-      policyReformSpans: [],
-      productTeamSpans,
       childBlueprints: [],
       rootDocument: null,
       activeBlueprintId: bpId,

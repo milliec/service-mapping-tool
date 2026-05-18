@@ -1,5 +1,5 @@
 import { getLaneTitle } from './lane-definitions';
-import { type BlueprintState, type Card, type LaneDefinition, type PolicyReformSpan, type Stage, type Step, type JourneySpan } from './types';
+import { type BlueprintState, type Card, type LaneDefinition, type Stage, type Step } from './types';
 
 function escapeHtml(value: string) {
   return value
@@ -53,29 +53,12 @@ function renderCard(card: Card, laneTitle: string) {
   `;
 }
 
-function renderSpanCard(span: JourneySpan | PolicyReformSpan, typeLabel: string, stepLookup: Map<string, Step>) {
-  const start = stepLookup.get(span.startStepId)?.title ?? 'Unknown step';
-  const end = stepLookup.get(span.endStepId)?.title ?? start;
-  return `
-    <article class="span-card">
-      <div class="card-meta">
-        <span class="lane-pill">${escapeHtml(typeLabel)}</span>
-      </div>
-      <h5>${escapeHtml(span.title)}</h5>
-      ${span.description ? `<p>${escapeHtml(span.description)}</p>` : ''}
-      <div class="span-range">${escapeHtml(start)} to ${escapeHtml(end)}</div>
-    </article>
-  `;
-}
-
 function sortByOrder<T extends { order: number }>(items: T[]) {
   return [...items].sort((a, b) => a.order - b.order);
 }
 
 function getRelevantLanes(state: BlueprintState) {
   const cardsByLane = new Set(state.cards.map((card) => card.laneKey));
-  if (state.journeySpans.length > 0) cardsByLane.add('user_journey');
-  if (state.policyReformSpans.length > 0) cardsByLane.add('policy_reform');
 
   return [...state.lanes]
     .filter((lane) => lane.visible || cardsByLane.has(lane.key))
@@ -87,18 +70,7 @@ function renderStageSection(
   steps: Step[],
   lanes: LaneDefinition[],
   cards: Card[],
-  journeySpans: JourneySpan[],
-  policyReformSpans: PolicyReformSpan[],
 ) {
-  const stepLookup = new Map(steps.map((step) => [step.id, step]));
-  const stageStepIds = new Set(steps.map((step) => step.id));
-  const stageJourneySpans = sortByOrder(
-    journeySpans.filter((span) => stageStepIds.has(span.startStepId) || stageStepIds.has(span.endStepId)),
-  );
-  const stagePolicySpans = sortByOrder(
-    policyReformSpans.filter((span) => stageStepIds.has(span.startStepId) || stageStepIds.has(span.endStepId)),
-  );
-
   return `
     <section class="stage">
       <header class="stage-header">
@@ -108,27 +80,6 @@ function renderStageSection(
         </div>
         ${stage.outcome ? `<p class="stage-outcome">${escapeHtml(stage.outcome)}</p>` : ''}
       </header>
-
-      ${(stageJourneySpans.length > 0 || stagePolicySpans.length > 0) ? `
-        <div class="span-section">
-          ${stagePolicySpans.length > 0 ? `
-            <div class="span-group">
-              <h4>Policy reforms</h4>
-              <div class="span-grid">
-                ${stagePolicySpans.map((span) => renderSpanCard(span, 'Policy reform', stepLookup)).join('')}
-              </div>
-            </div>
-          ` : ''}
-          ${stageJourneySpans.length > 0 ? `
-            <div class="span-group">
-              <h4>User journeys</h4>
-              <div class="span-grid">
-                ${stageJourneySpans.map((span) => renderSpanCard(span, 'User journey', stepLookup)).join('')}
-              </div>
-            </div>
-          ` : ''}
-        </div>
-      ` : ''}
 
       <div class="steps-grid">
         ${steps.map((step) => `
@@ -140,7 +91,6 @@ function renderStageSection(
             <div class="lane-list">
               ${lanes.map((lane) => {
                 const laneCards = sortByOrder(cards.filter((card) => card.stepId === step.id && card.laneKey === lane.key));
-                if (lane.key === 'user_journey' || lane.key === 'policy_reform') return '';
                 if (laneCards.length === 0) return '';
                 return `
                   <section class="lane-block">
@@ -178,8 +128,6 @@ function renderDocument(state: BlueprintState, title?: string): string {
           <div class="summary-card"><span>Stages</span><strong>${stages.length}</strong></div>
           <div class="summary-card"><span>Steps</span><strong>${steps.length}</strong></div>
           <div class="summary-card"><span>Cards</span><strong>${state.cards.length}</strong></div>
-          <div class="summary-card"><span>Journeys</span><strong>${state.journeySpans.length}</strong></div>
-          <div class="summary-card"><span>Reforms</span><strong>${state.policyReformSpans.length}</strong></div>
         </div>
       </header>
 
@@ -187,7 +135,7 @@ function renderDocument(state: BlueprintState, title?: string): string {
 
       ${stages.map((stage) => {
         const stageSteps = steps.filter((step) => step.stageId === stage.id);
-        return renderStageSection(stage, stageSteps, lanes, state.cards, state.journeySpans, state.policyReformSpans);
+        return renderStageSection(stage, stageSteps, lanes, state.cards);
       }).join('')}
 
       ${childDocuments.length > 0 ? `

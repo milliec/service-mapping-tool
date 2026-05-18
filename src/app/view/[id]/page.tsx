@@ -6,8 +6,6 @@ import { useBlueprintStore } from '@/store/blueprint-store';
 import { BoardToolbar } from '@/components/board/BoardToolbar';
 import { Board } from '@/components/board/Board';
 import type { BlueprintState } from '@/lib/types';
-import { isOstPrimarySnapshot } from '@/lib/ost-primary-snapshot';
-import { OpportunitySolutionTree } from '@/components/board/OpportunitySolutionTree';
 
 type FetchState =
   | { status: 'loading' }
@@ -21,9 +19,6 @@ export default function ViewSharePage() {
 
   const loadSharedSnapshot = useBlueprintStore((s) => s.loadSharedSnapshot);
   const stages = useBlueprintStore((s) => s.stages);
-  const strategicGoals = useBlueprintStore((s) => s.strategicGoals);
-  const outcomes = useBlueprintStore((s) => s.outcomes);
-  const ostPanelOpen = useBlueprintStore((s) => s.ostPanelOpen);
 
   const [fetchState, setFetchState] = useState<FetchState>({ status: 'loading' });
 
@@ -99,23 +94,18 @@ export default function ViewSharePage() {
     );
   }
 
-  const hasOstContent = isOstPrimarySnapshot({ stages, strategicGoals, outcomes });
-
   // Ready — render the same board UI. The readOnly flag (set by
-  // loadSharedSnapshot) will be honoured in B5 to disable editing.
+  // loadSharedSnapshot) will be honoured to disable editing.
   return (
     <div className="flex h-screen flex-col bg-[#fafafa]">
       <BoardToolbar onImport={() => { /* no-op in read-only */ }} />
-      {stages.length === 0 && !hasOstContent ? (
+      {stages.length === 0 ? (
         <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-neutral-500">
           This shared blueprint is empty.
         </div>
-      ) : stages.length === 0 ? (
-        <div className="min-h-0 flex-1" aria-hidden="true" />
       ) : (
         <Board />
       )}
-      {ostPanelOpen ? <OpportunitySolutionTree /> : null}
     </div>
   );
 }

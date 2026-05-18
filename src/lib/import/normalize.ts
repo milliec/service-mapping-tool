@@ -37,7 +37,6 @@ function capitalizeSentenceStart(text: string): string {
 }
 
 const SWIMLANE_LANE_ALIASES: Record<string, LaneKey> = {
-  user_journeys: 'user_journey',
   user_action: 'user_action_event',
   actors: 'actor',
   primary_actor: 'actor',
@@ -133,7 +132,7 @@ const SWIMLANE_FIRST_COL_KEYS = new Set([
   'service_name', 'stage', 'stage_outcome', 'step', 'next_step',
   'actor', 'actors', 'primary_actor', 'secondary_actor', 'secondary_actors',
   'primary_actors',
-  'user_journey', 'user_journeys',
+  'user_journeys',
   'user_action', 'user_need', 'user_needs', 'pain_point',
   'frontstage_touchpoint', 'frontstage_touchpoints', 'activity', 'activities',
   'user_activity', 'user_activities', 'user_task', 'user_tasks', 'tasks',
@@ -268,9 +267,6 @@ function emptyImportState(bpId: string, ts: string, serviceName: string): Bluepr
     stages: [],
     steps: [],
     lanes: DEFAULT_LANES.map((l) => ({ ...l })),
-    journeySpans: [],
-    policyReformSpans: [],
-    productTeamSpans: [],
     childBlueprints: [],
     rootDocument: null,
     activeBlueprintId: bpId,

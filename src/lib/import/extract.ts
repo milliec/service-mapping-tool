@@ -82,7 +82,6 @@ export function extractFromCsv(text: string, fileName: string): ExtractionResult
 // ---------------------------------------------------------------------------
 
 const SWIMLANE_LANE_ALIASES: Record<string, LaneKey> = {
-  user_journeys: 'user_journey',
   user_action: 'user_action_event',
   actors: 'actor',
   primary_actor: 'actor',
@@ -337,67 +336,6 @@ function extractFromSwimlaneMatrix(
   }
 
   for (const { laneKey, sourceTags, row, rowIndex } of laneRows) {
-    // product_teams is a SPAN lane (like user_journey on L2): consecutive cells
-    // with the same team name become a single span, not one card per cell.
-    if (laneKey === 'product_teams') {
-      let runStart: string | null = null;
-      let runEnd: string | null = null;
-      let runTitle = '';
-      const flushRun = () => {
-        if (runStart === null || runEnd === null || !runTitle) return;
-        splitCellItems(runTitle).forEach((teamTitle) => {
-          rows.push({
-            sourceType: 'xlsx',
-            sourceFileName: fileName,
-            sourceSheetOrPage: sheetName,
-            sourceRowNumber: rowIndex,
-            extractedHeaders: flatHeaders,
-            extractedCells: {
-              record_type: 'structure_row',
-              stage: colStage[runStart!],
-              step: colStep[runStart!],
-              lane_key: '',
-              card_title: '',
-              tags: '',
-              phase: '',
-              description: '',
-              span_type: 'product_team',
-              span_title: teamTitle,
-              start_stage: colStage[runStart!],
-              start_step: colStep[runStart!],
-              end_stage: colStage[runEnd!],
-              end_step: colStep[runEnd!],
-            },
-            rawText: `product_team_span\t${teamTitle}\t${colStep[runStart!]}..${colStep[runEnd!]}`,
-          });
-        });
-      };
-      for (const colKey of stepColKeys) {
-        const value = (row[colKey] ?? '').trim();
-        if (!value) {
-          // Empty cell closes any open run
-          flushRun();
-          runStart = null;
-          runEnd = null;
-          runTitle = '';
-          continue;
-        }
-        if (value === runTitle && runStart !== null) {
-          // Extend current run
-          runEnd = colKey;
-        } else {
-          // New team: flush previous and start new run
-          flushRun();
-          runStart = colKey;
-          runEnd = colKey;
-          runTitle = value;
-        }
-      }
-      flushRun();
-      // product_teams does not emit card_rows — it only emits span markers.
-      continue;
-    }
-
     for (const colKey of stepColKeys) {
       const cellValue = (row[colKey] ?? '').trim();
       if (!cellValue) continue;

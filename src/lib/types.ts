@@ -43,49 +43,6 @@ export interface LaneDefinition {
   collapsed: boolean;
 }
 
-export interface JourneySpan {
-  id: string;
-  blueprintId: string;
-  title: string;
-  description?: string;
-  productTeam?: string;
-  startStepId: string;
-  endStepId: string;
-  order: number;
-  childBlueprintId: string;
-  level: 'L1' | 'L2' | 'L3';
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface PolicyReformSpan {
-  id: string;
-  blueprintId: string;
-  title: string;
-  description?: string;
-  startStepId: string;
-  endStepId: string;
-  order: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/**
- * A product team responsible for a range of steps on L3.
- * Visual-only span (like JourneySpan but with no child blueprint to drill into).
- */
-export interface ProductTeamSpan {
-  id: string;
-  blueprintId: string;
-  title: string;
-  description?: string;
-  startStepId: string;
-  endStepId: string;
-  order: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export type CardStatus = 'draft' | 'in_review' | 'approved' | 'blocked';
 
 export type LinkRelation =
@@ -157,7 +114,6 @@ export interface Card {
 
 export const LANE_KEYS = [
   // L2 Micro lanes
-  'user_journey',
   'actor',
   'user_action_event',
   'user_need',
@@ -178,11 +134,9 @@ export const LANE_KEYS = [
   'data_output',
   'backstage_actor',
   'shared_services',
-  'product_teams',
   'opportunities',
   'ideas',
   // L1 Macro lanes
-  'policy_reform',
   'policy_outcome',
   'user_outcome',
   'operational_outcome',
@@ -346,30 +300,6 @@ export interface Assumption {
   updatedAt: string;
 }
 
-export interface L2JourneyStep {
-  id: string;           // 'L2-01'
-  order: number;
-  title: string;
-  areaCodes: string[];  // e.g. ['A1','A2','C1'] — links to Defra opportunity area codes
-  envOutcomes: string;  // raw ENV-01/02/03 text from spreadsheet
-  opportunity: string;  // strategic narrative for this journey step
-  ideas: string;        // specific intervention ideas
-  desiredBehaviourChange: string;
-  successMeasure: string;
-}
-
-export interface L3ServiceStep {
-  id: string;           // 'L3-01'
-  order: number;
-  title: string;
-  l2ParentId: string | null; // links to L2JourneyStep.id
-  productTeams: string;      // which product team(s) own this step
-  opportunity: string;       // problem statement for this service step
-  ideas: string;             // feature/capability ideas
-  successMeasure: string;    // KPIs / success measures
-  desiredBehaviourChange: string;
-}
-
 export interface SystemOutcome {
   id: string;
   blueprintId: string;
@@ -449,9 +379,6 @@ export interface BlueprintState {
   stages: Stage[];
   steps: Step[];
   lanes: LaneDefinition[];
-  journeySpans: JourneySpan[];
-  policyReformSpans: PolicyReformSpan[];
-  productTeamSpans: ProductTeamSpan[];
   childBlueprints: BlueprintState[];
   /** Root board snapshot while a child journey is open. Null/undefined when viewing the root board. */
   rootDocument?: BlueprintState | null;

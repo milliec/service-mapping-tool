@@ -16,8 +16,6 @@ import {
   type LaneKey,
   type LinkRelation,
   type Opportunity,
-  type PolicyReformSpan,
-  type ProductTeamSpan,
   type OpportunityStatus,
   type Requirement,
   type Solution,
@@ -26,7 +24,6 @@ import {
   type Step,
   type StepLink,
   type StoryboardImage,
-  type JourneySpan,
   type UiScaffold,
   type StrategicGoal,
   type Outcome,
@@ -38,8 +35,7 @@ import {
   createUiScaffoldFromRequirementAndApi,
 } from '@/lib/traceability/downstream';
 import { DEFAULT_LANES, L1_MACRO_LANES, L1_MACRO_LANE_KEYS, L3_LANE_KEYS } from '@/lib/lane-definitions';
-import { createSeedBlueprint, createExampleOstBlueprint, createDefraEnvironmentalOstBlueprint } from '@/lib/seed-data';
-import { isOstPrimarySnapshot } from '@/lib/ost-primary-snapshot';
+import { createSeedBlueprint } from '@/lib/seed-data';
 import { getLanePrefix } from '@/lib/traceability/registry';
 import { generateTraceabilityCode } from '@/lib/traceability/service';
 
@@ -50,53 +46,8 @@ function now() {
   return new Date().toISOString();
 }
 
-function shouldForceLaneVisible(key: LaneKey) {
-  return key === 'user_journey';
-}
-
-function createEmptyJourneyDocument(title: string, level: 'L2' | 'L3'): BlueprintState {
-  const id = uuid();
-  const ts = now();
-  const stageId = uuid();
-  const stepId = uuid();
-  const lanes = DEFAULT_LANES.map((lane) => ({
-    ...lane,
-    visible: level === 'L3' && L3_LANE_KEYS.includes(lane.key as (typeof L3_LANE_KEYS)[number])
-      ? true
-      : lane.visible,
-  }));
-  return {
-    blueprint: { id, serviceName: title, description: '', createdAt: ts, updatedAt: ts },
-    stages: [{ id: stageId, blueprintId: id, title: 'Journey step', outcome: '', order: 0 }],
-    steps: [{ id: stepId, blueprintId: id, stageId, title: 'Journey step', order: 0 }],
-    lanes,
-    journeySpans: [],
-    policyReformSpans: [],
-    productTeamSpans: [],
-    childBlueprints: [],
-    rootDocument: null,
-    activeBlueprintId: id,
-    rootBlueprintId: id,
-    cards: [],
-    storyboardImages: [],
-    storyboardVisible: true,
-    storyboardCollapsed: false,
-    cardLinks: [],
-    evidence: [],
-    opportunities: [],
-    solutions: [],
-    assumptions: [],
-    strategicGoals: [],
-    outcomes: [],
-    systemOutcomes: [],
-    behaviourOutcomes: [],
-    serviceOutcomes: [],
-    stepLinks: [],
-    requirements: [],
-    apiContracts: [],
-    uiScaffolds: [],
-    traceabilityCounters: {},
-  };
+function shouldForceLaneVisible(_key: LaneKey) {
+  return false;
 }
 
 function isChildJourneyOpen(state: BlueprintState) {
@@ -160,34 +111,6 @@ function applyL3LaneVisibility(lanes: LaneDefinition[]): LaneDefinition[] {
       collapsed: existingLane?.collapsed ?? defaultLane.collapsed,
     };
   });
-}
-
-function getActiveJourneyLevel(state: BlueprintState): JourneySpan['level'] | null {
-  const activeBlueprintId = state.activeBlueprintId ?? state.blueprint.id;
-  const rootBlueprintId = state.rootBlueprintId ?? state.rootDocument?.blueprint.id ?? state.blueprint.id;
-  if (activeBlueprintId === rootBlueprintId) return null;
-
-  let current: BlueprintState | null = state;
-  const seen = new Set<string>();
-  while (current && !seen.has(current.blueprint.id)) {
-    seen.add(current.blueprint.id);
-    const journey = current.journeySpans.find((item) => item.childBlueprintId === activeBlueprintId);
-    if (journey) return journey.level;
-    current = current.rootDocument ?? null;
-  }
-
-  const findInChildTree = (doc: BlueprintState): JourneySpan['level'] | null => {
-    for (const journey of doc.journeySpans ?? []) {
-      if (journey.childBlueprintId === activeBlueprintId) return journey.level;
-    }
-    for (const child of doc.childBlueprints ?? []) {
-      const found = findInChildTree(child);
-      if (found) return found;
-    }
-    return null;
-  };
-
-  return findInChildTree(state);
 }
 
 function sanitizeTypedTraceableLaneCard(card: Card): Card {
@@ -403,7 +326,6 @@ function stripSuccessMeasureReferenceText(card: Card): Card {
  */
 function normalizeChildTreeNode(child: BlueprintState, parent: BlueprintState): BlueprintState {
   const childBaseLanes = pickBaseLanes(child);
-  const parentJourney = (parent.journeySpans ?? []).find((journey) => journey.childBlueprintId === child.blueprint.id);
   const childLanes = childBaseLanes.map((defaultLane) => {
     const existingLane = (child.lanes ?? []).find((lane) => lane.key === defaultLane.key);
     return existingLane
@@ -432,9 +354,6 @@ function normalizeChildTreeNode(child: BlueprintState, parent: BlueprintState): 
   const nestedChildren = (child.childBlueprints ?? []).map((nested) => normalizeChildTreeNode(nested, child));
   return {
     ...child,
-    journeySpans: child.journeySpans ?? [],
-    policyReformSpans: child.policyReformSpans ?? [],
-    productTeamSpans: child.productTeamSpans ?? [],
     childBlueprints: nestedChildren,
     rootDocument: null,
     activeBlueprintId: child.blueprint.id,
@@ -457,7 +376,7 @@ function normalizeChildTreeNode(child: BlueprintState, parent: BlueprintState): 
     systemOutcomes: child.systemOutcomes ?? [],
     behaviourOutcomes: child.behaviourOutcomes ?? [],
     serviceOutcomes: child.serviceOutcomes ?? [],
-    lanes: parentJourney?.level === 'L3' ? applyL3LaneVisibility(childLanes) : childLanes,
+    lanes: childLanes,
     cards: normalizedChildCards,
   };
 }
@@ -465,14 +384,9 @@ function normalizeChildTreeNode(child: BlueprintState, parent: BlueprintState): 
 function normalizeState(state: BlueprintState): BlueprintState {
   const lanesByKey = new Map(state.lanes.map((lane) => [lane.key, lane]));
   const baseLanes = pickBaseLanes(state);
-  const activeJourneyLevel = getActiveJourneyLevel(state);
-
   // Build the base normalized state first (backward-compat field defaults)
   const base: BlueprintState = {
     ...state,
-    journeySpans: state.journeySpans ?? [],
-    policyReformSpans: state.policyReformSpans ?? [],
-    productTeamSpans: state.productTeamSpans ?? [],
     childBlueprints: (state.childBlueprints ?? []).map((child) => normalizeChildTreeNode(child, state)),
     rootDocument: state.rootDocument ?? null,
     activeBlueprintId: state.activeBlueprintId ?? state.blueprint.id,
@@ -548,7 +462,7 @@ function normalizeState(state: BlueprintState): BlueprintState {
 
   return {
     ...base,
-    lanes: activeJourneyLevel === 'L3' ? applyL3LaneVisibility(base.lanes) : base.lanes,
+    lanes: base.lanes,
     stages,
     steps,
     cards,
@@ -593,9 +507,6 @@ interface BlueprintStore extends BlueprintState {
   /** Retroactively assigns a traceability code to an existing entity that doesn't have one yet. */
   assignTraceabilityCode: (entityId: string, entityType: 'stage' | 'step' | 'card' | 'evidence' | 'opportunity') => string | null;
   loadSeed: () => void;
-  loadExampleOst: () => void;
-  loadDefraOst: () => void;
-  resetOpportunityTree: () => void;
 
   // Stages
   addStage: (title: string) => void;
@@ -615,25 +526,6 @@ interface BlueprintStore extends BlueprintState {
   setLaneVisibility: (key: LaneKey, visible: boolean) => void;
   toggleLaneCollapsed: (key: LaneKey) => void;
 
-  // Journeys
-  addJourneySpan: (stepIdOrConfig?: string | { title?: string; description?: string; productTeam?: string; startStepId?: string; endStepId?: string }) => string | null;
-  updateJourneySpan: (id: string, patch: Partial<Pick<JourneySpan, 'title' | 'description' | 'productTeam' | 'startStepId' | 'endStepId'>>) => void;
-  deleteJourneySpan: (id: string) => void;
-  /**
-   * If a journey span references a child blueprint id that is missing from
-   * `childBlueprints` (e.g. stale L1 snapshot) but that id exists as a library
-   * row (typical when the L2 macro was saved from the library while viewing
-   * it), embed that snapshot as the child so Open journey can drill in.
-   */
-  hydrateJourneyChildFromLibraryIfMissing: (childBlueprintId: string) => void;
-  openJourneySpan: (id: string) => void;
-  closeJourneyView: () => void;
-  addPolicyReformSpan: (config?: { title?: string; description?: string; startStepId?: string; endStepId?: string }) => string | null;
-  updatePolicyReformSpan: (id: string, patch: Partial<Pick<PolicyReformSpan, 'title' | 'description' | 'startStepId' | 'endStepId'>>) => void;
-  deletePolicyReformSpan: (id: string) => void;
-  addProductTeamSpan: (config?: { title?: string; description?: string; startStepId?: string; endStepId?: string }) => string | null;
-  updateProductTeamSpan: (id: string, patch: Partial<Pick<ProductTeamSpan, 'title' | 'description' | 'startStepId' | 'endStepId'>>) => void;
-  deleteProductTeamSpan: (id: string) => void;
 
   // Cards
   addCard: (stepId: string, laneKey: LaneKey, title: string, body?: string, tags?: string[]) => void;
@@ -645,12 +537,6 @@ interface BlueprintStore extends BlueprintState {
   // Card selection (ephemeral — not persisted, not in undo history)
   selectedCardId: string | null;
   selectCard: (id: string | null) => void;
-  selectedJourneySpanId: string | null;
-  selectJourneySpan: (id: string | null) => void;
-  selectedPolicyReformSpanId: string | null;
-  selectPolicyReformSpan: (id: string | null) => void;
-  selectedProductTeamSpanId: string | null;
-  selectProductTeamSpan: (id: string | null) => void;
 
   // Card links
   addCardLink: (sourceCardId: string, targetCardId: string, relation: LinkRelation) => void;
@@ -722,30 +608,6 @@ interface BlueprintStore extends BlueprintState {
   deleteOutcome: (id: string) => void;
   assignOpportunityToOutcome: (opportunityId: string, outcomeId: string | undefined) => void;
 
-  // OST panel (ephemeral)
-  ostPanelOpen: boolean;
-  setOstPanelOpen: (open: boolean) => void;
-  ostViewMode: 'goal-map' | 'contribution-chain';
-  setOstViewMode: (mode: 'goal-map' | 'contribution-chain') => void;
-
-  // Strategy spine filter (ephemeral)
-  spineFilter: { type: 'sys' | 'beh' | 'so'; code: string } | null;
-  setSpineFilter: (filter: { type: 'sys' | 'beh' | 'so'; code: string } | null) => void;
-
-  // Strategic alignment overlay (ephemeral, cross-level outcome cascade)
-  strategicAlignmentOpen: boolean;
-  setStrategicAlignmentOpen: (open: boolean) => void;
-
-  // Opportunities panel (ephemeral)
-  opportunitiesPanelOpen: boolean;
-  setOpportunitiesPanelOpen: (open: boolean) => void;
-
-  // Contribution path panel (ephemeral)
-  // When non-null, the right-side panel renders the upward chain
-  // (AREA → SO → BEH → SYS → ENV) for this opportunity id.
-  contributionPathOppId: string | null;
-  setContributionPathOppId: (id: string | null) => void;
-
   // Helpers
   /** Root-level snapshot with merged nested journeys (matches localStorage). */
   getPersistableDocument: () => BlueprintState;
@@ -763,9 +625,6 @@ function emptyBlueprint(): BlueprintState {
     stages: [],
     steps: [],
     lanes: DEFAULT_LANES.map(l => ({ ...l })),
-    journeySpans: [],
-    policyReformSpans: [],
-    productTeamSpans: [],
     childBlueprints: [],
     rootDocument: null,
     activeBlueprintId: id,
@@ -802,9 +661,6 @@ function pickDocumentState(state: BlueprintState): BlueprintState {
     stages: state.stages,
     steps: state.steps,
     lanes: state.lanes,
-    journeySpans: state.journeySpans ?? [],
-    policyReformSpans: state.policyReformSpans ?? [],
-    productTeamSpans: state.productTeamSpans ?? [],
     childBlueprints: state.childBlueprints ?? [],
     rootDocument: state.rootDocument ?? null,
     activeBlueprintId: state.activeBlueprintId ?? bp.id,
@@ -882,9 +738,6 @@ function cloneDocumentState(state: BlueprintState): BlueprintState {
     stages: (state.stages ?? []).map((stage) => ({ ...stage })),
     steps: (state.steps ?? []).map((step) => ({ ...step })),
     lanes: (state.lanes ?? []).map((lane) => ({ ...lane })),
-    journeySpans: (state.journeySpans ?? []).map((journey) => ({ ...journey })),
-    policyReformSpans: (state.policyReformSpans ?? []).map((span) => ({ ...span })),
-    productTeamSpans: (state.productTeamSpans ?? []).map((span) => ({ ...span })),
     childBlueprints: (state.childBlueprints ?? []).map((child) => cloneDocumentState(child)),
     rootDocument: state.rootDocument ? cloneDocumentState(state.rootDocument) : null,
     activeBlueprintId: state.activeBlueprintId ?? bp.id,
@@ -1005,9 +858,6 @@ function persist(state: BlueprintState) {
     stages: forDisk.stages,
     steps: forDisk.steps,
     lanes: forDisk.lanes,
-    journeySpans: forDisk.journeySpans ?? [],
-    policyReformSpans: forDisk.policyReformSpans ?? [],
-    productTeamSpans: forDisk.productTeamSpans ?? [],
     childBlueprints: forDisk.childBlueprints ?? [],
     rootDocument: forDisk.rootDocument ?? null,
     activeBlueprintId: forDisk.activeBlueprintId ?? forDisk.blueprint.id,
@@ -1042,15 +892,6 @@ export const useBlueprintStore = create<BlueprintStore>((set, get) => ({
   canUndo: false,
   canRedo: false,
   selectedCardId: null,
-  selectedJourneySpanId: null,
-  selectedPolicyReformSpanId: null,
-  selectedProductTeamSpanId: null,
-  opportunitiesPanelOpen: false,
-  contributionPathOppId: null,
-  ostPanelOpen: false,
-  ostViewMode: 'goal-map' as const,
-  spineFilter: null,
-  strategicAlignmentOpen: false,
   readOnly: false,
 
   hydrate: () => {
@@ -1274,9 +1115,6 @@ export const useBlueprintStore = create<BlueprintStore>((set, get) => ({
         canUndo: false,
         canRedo: false,
         readOnly: true,
-        // Defra / example OST maps have no stages; viewers need the tree open.
-        ostPanelOpen: isOstPrimarySnapshot(loaded),
-        strategicAlignmentOpen: false,
       };
     });
   },
@@ -1306,21 +1144,12 @@ export const useBlueprintStore = create<BlueprintStore>((set, get) => ({
 
       // Child view → replace only this child's content. Keep:
       //   - rootDocument + rootBlueprintId (the parent chain)
-      //   - activeBlueprintId (so parent's journeySpan link stays valid)
-      // Drop this child's own descendants (journeySpans + childBlueprints)
+      //   - activeBlueprintId (so parent's journey link stays valid)
+      // Drop this child's own descendants (childBlueprints)
       // per user's choice: new import invalidates any L3 children.
       const current = cloneDocumentState(pickDocumentState(s));
       const normalized = normalizeState(state);
       const imported = cloneDocumentState(normalized);
-
-      // The imported state arrives with rootDocument: null, so normalizeState
-      // can't tell it's landing in an L3 slot. Re-check using the current
-      // store's parent chain and force all L3 lanes visible if so — otherwise
-      // lanes like product_teams, data_input, etc. stay hidden by default.
-      const activeLevel = getActiveJourneyLevel(s);
-      const importedLanes = activeLevel === 'L3'
-        ? applyL3LaneVisibility(imported.lanes)
-        : imported.lanes;
 
       const next: BlueprintState = {
         // keep the current child's identity so parent spans still reference it
@@ -1330,7 +1159,7 @@ export const useBlueprintStore = create<BlueprintStore>((set, get) => ({
         },
         stages: imported.stages,
         steps: imported.steps,
-        lanes: importedLanes,
+        lanes: imported.lanes,
         cards: imported.cards,
         storyboardImages: imported.storyboardImages,
         storyboardVisible: imported.storyboardVisible,
@@ -1350,11 +1179,7 @@ export const useBlueprintStore = create<BlueprintStore>((set, get) => ({
         apiContracts: imported.apiContracts,
         uiScaffolds: imported.uiScaffolds,
         traceabilityCounters: imported.traceabilityCounters,
-        // keep the imported productTeamSpans — they're this child's own visual grouping
-        productTeamSpans: imported.productTeamSpans,
         // wipe this child's own descendants — they belonged to old data
-        journeySpans: [],
-        policyReformSpans: [],
         childBlueprints: [],
         // preserve hierarchy
         rootDocument: s.rootDocument,
@@ -1478,70 +1303,6 @@ export const useBlueprintStore = create<BlueprintStore>((set, get) => ({
         ...s,
         ...seed,
         _hydrated: true,
-        _past: nextPast,
-        _future: [],
-        canUndo: nextPast.length > 0,
-        canRedo: false,
-      };
-    });
-  },
-
-  loadExampleOst: () => {
-    set((s) => {
-      const current = cloneDocumentState(pickDocumentState(s));
-      const example = cloneDocumentState(createExampleOstBlueprint());
-      const nextPast = [...s._past, current].slice(-HISTORY_LIMIT);
-      persist(example);
-      return {
-        ...s,
-        ...example,
-        _hydrated: true,
-        _past: nextPast,
-        _future: [],
-        canUndo: nextPast.length > 0,
-        canRedo: false,
-      };
-    });
-  },
-
-  loadDefraOst: () => {
-    set((s) => {
-      const current = cloneDocumentState(pickDocumentState(s));
-      const example = cloneDocumentState(createDefraEnvironmentalOstBlueprint());
-      const nextPast = [...s._past, current].slice(-HISTORY_LIMIT);
-      persist(example);
-      return {
-        ...s,
-        ...example,
-        _hydrated: true,
-        _past: nextPast,
-        _future: [],
-        canUndo: nextPast.length > 0,
-        canRedo: false,
-      };
-    });
-  },
-
-  resetOpportunityTree: () => {
-    set((s) => {
-      const current = cloneDocumentState(pickDocumentState(s));
-      const nextDocument = cloneDocumentState({
-        ...current,
-        strategicGoals: [],
-        outcomes: [],
-        opportunities: [],
-        solutions: [],
-        assumptions: [],
-      });
-      if (isSameDocument(current, nextDocument)) {
-        return { ...s, ostPanelOpen: true };
-      }
-      const nextPast = [...s._past, current].slice(-HISTORY_LIMIT);
-      persist(nextDocument);
-      return {
-        ...s,
-        ...nextDocument,
-        ostPanelOpen: true,
         _past: nextPast,
         _future: [],
         canUndo: nextPast.length > 0,
@@ -1880,498 +1641,6 @@ export const useBlueprintStore = create<BlueprintStore>((set, get) => ({
     });
   },
 
-  // Journeys
-  addJourneySpan: (stepIdOrConfig) => {
-    let createdId: string | null = null;
-    set((s) => {
-      const current = cloneDocumentState(pickDocumentState(s));
-      if (current.steps.length === 0) return s;
-      const config = typeof stepIdOrConfig === 'string' || typeof stepIdOrConfig === 'undefined'
-        ? { startStepId: stepIdOrConfig, endStepId: stepIdOrConfig }
-        : stepIdOrConfig;
-      const sortedSteps = [...current.steps].sort((a, b) => {
-        if (a.stageId === b.stageId) return a.order - b.order;
-        const stageA = current.stages.find((stage) => stage.id === a.stageId)?.order ?? 0;
-        const stageB = current.stages.find((stage) => stage.id === b.stageId)?.order ?? 0;
-        return stageA - stageB || a.order - b.order;
-      });
-      const defaultStep = sortedSteps[0];
-      const rawStartStep = config.startStepId ? current.steps.find((step) => step.id === config.startStepId) ?? defaultStep : defaultStep;
-      const rawEndStep = config.endStepId ? current.steps.find((step) => step.id === config.endStepId) ?? rawStartStep : rawStartStep;
-      const stepOrder = new Map(sortedSteps.map((step, index) => [step.id, index]));
-      const [startStep, endStep] =
-        (stepOrder.get(rawStartStep.id) ?? 0) <= (stepOrder.get(rawEndStep.id) ?? 0)
-          ? [rawStartStep, rawEndStep]
-          : [rawEndStep, rawStartStep];
-      const title = config.title?.trim() || startStep.title;
-      const ts = now();
-      // When inside a child journey (L2), new nested journeys are L3 (Micro).
-      // At the root level (L1), nested journeys are L2 (Macro).
-      const level = isChildJourneyOpen(s) ? 'L3' : 'L2';
-      const child = createEmptyJourneyDocument(title, level);
-      const span: JourneySpan = {
-        id: uuid(),
-        blueprintId: current.blueprint.id,
-        title,
-        description: config.description?.trim() ?? '',
-        productTeam: config.productTeam?.trim() ?? '',
-        startStepId: startStep.id,
-        endStepId: endStep.id,
-        order: current.journeySpans.length,
-        childBlueprintId: child.blueprint.id,
-        level,
-        createdAt: ts,
-        updatedAt: ts,
-      };
-      createdId = span.id;
-      const nextDocument = cloneDocumentState({
-        ...current,
-        journeySpans: [...current.journeySpans, span],
-        childBlueprints: upsertChildBlueprint(current, child),
-        blueprint: { ...current.blueprint, updatedAt: ts },
-      });
-      const nextPast = [...s._past, current].slice(-HISTORY_LIMIT);
-      persist(nextDocument);
-      return {
-        ...s,
-        ...nextDocument,
-        selectedJourneySpanId: span.id,
-        selectedPolicyReformSpanId: null,
-        selectedProductTeamSpanId: null,
-        selectedCardId: null,
-        _past: nextPast,
-        _future: [],
-        canUndo: nextPast.length > 0,
-        canRedo: false,
-      };
-    });
-    return createdId;
-  },
-
-  updateJourneySpan: (id, patch) => {
-    set((s) => {
-      const current = cloneDocumentState(pickDocumentState(s));
-      const stepOrder = new Map(
-        [...current.steps]
-          .sort((a, b) => {
-            const stageA = current.stages.find((stage) => stage.id === a.stageId)?.order ?? 0;
-            const stageB = current.stages.find((stage) => stage.id === b.stageId)?.order ?? 0;
-            return stageA - stageB || a.order - b.order;
-          })
-          .map((step, index) => [step.id, index]),
-      );
-      const timestamp = now();
-      const targetJourney = current.journeySpans.find((journey) => journey.id === id);
-      if (!targetJourney) return s;
-      const nextStart = patch.startStepId ?? targetJourney.startStepId;
-      const nextEnd = patch.endStepId ?? targetJourney.endStepId;
-      const normalizedPatch =
-        (stepOrder.get(nextStart) ?? 0) <= (stepOrder.get(nextEnd) ?? 0)
-          ? patch
-          : { ...patch, startStepId: nextEnd, endStepId: nextStart };
-      const nextDocument = cloneDocumentState({
-        ...current,
-        journeySpans: current.journeySpans.map((journey) => {
-          if (journey.id !== id) return journey;
-          return { ...journey, ...normalizedPatch, updatedAt: timestamp };
-        }),
-        childBlueprints: current.childBlueprints.map((child) => {
-          if (child.blueprint.id !== targetJourney.childBlueprintId) return child;
-          if (!normalizedPatch.title) return child;
-          return {
-            ...child,
-            blueprint: { ...child.blueprint, serviceName: normalizedPatch.title, updatedAt: timestamp },
-          };
-        }),
-        blueprint: { ...current.blueprint, updatedAt: timestamp },
-      });
-      if (isSameDocument(current, nextDocument)) return s;
-      const nextPast = [...s._past, current].slice(-HISTORY_LIMIT);
-      persist(nextDocument);
-      return {
-        ...s,
-        ...nextDocument,
-        _past: nextPast,
-        _future: [],
-        canUndo: nextPast.length > 0,
-        canRedo: false,
-      };
-    });
-  },
-
-  deleteJourneySpan: (id) => {
-    set((s) => {
-      const current = cloneDocumentState(pickDocumentState(s));
-      const journey = current.journeySpans.find((item) => item.id === id);
-      if (!journey) return s;
-      const nextJourneySpans = current.journeySpans
-        .filter((item) => item.id !== id)
-        .map((item, index) => ({ ...item, order: index }));
-      const nextDocument = cloneDocumentState({
-        ...current,
-        journeySpans: nextJourneySpans,
-        childBlueprints: current.childBlueprints.filter((doc) => doc.blueprint.id !== journey.childBlueprintId),
-        blueprint: { ...current.blueprint, updatedAt: now() },
-      });
-      if (isSameDocument(current, nextDocument)) return s;
-      const nextPast = [...s._past, current].slice(-HISTORY_LIMIT);
-      persist(nextDocument);
-      return {
-        ...s,
-        ...nextDocument,
-        selectedJourneySpanId: s.selectedJourneySpanId === id ? null : s.selectedJourneySpanId,
-        _past: nextPast,
-        _future: [],
-        canUndo: nextPast.length > 0,
-        canRedo: false,
-      };
-    });
-  },
-
-  hydrateJourneyChildFromLibraryIfMissing: (childBlueprintId) => {
-    set((s) => {
-      const current = cloneDocumentState(pickDocumentState(s));
-      if (current.childBlueprints?.some((c) => c.blueprint.id === childBlueprintId)) {
-        return s;
-      }
-      useLibraryStore.getState().hydrate();
-      const entry = useLibraryStore.getState().entries.find((e) => e.id === childBlueprintId);
-      if (!entry) return s;
-      const normalized = normalizeState(entry.state);
-      if (normalized.blueprint.id !== childBlueprintId) return s;
-      const embedded = cloneDocumentState({
-        ...normalized,
-        rootDocument: null,
-        activeBlueprintId: normalized.blueprint.id,
-        rootBlueprintId: normalized.blueprint.id,
-      });
-      const nextDocument = cloneDocumentState({
-        ...current,
-        childBlueprints: upsertChildBlueprint(current, embedded),
-        blueprint: { ...current.blueprint, updatedAt: now() },
-      });
-      const nextPast = [...s._past, current].slice(-HISTORY_LIMIT);
-      persist(nextDocument);
-      return {
-        ...s,
-        ...nextDocument,
-        _past: nextPast,
-        _future: [],
-        canUndo: nextPast.length > 0,
-        canRedo: false,
-      };
-    });
-  },
-
-  openJourneySpan: (id) => {
-    set((s) => {
-      const current = cloneDocumentState(pickDocumentState(s));
-      const journey = current.journeySpans.find((item) => item.id === id);
-      if (!journey) return s;
-      const child = current.childBlueprints.find((doc) => doc.blueprint.id === journey.childBlueprintId);
-      if (!child) return s;
-      // Preserve the full parent chain: current state (which may already have a
-      // rootDocument pointing to a grandparent) becomes the new rootDocument.
-      const activeChild = cloneDocumentState({
-        ...child,
-        lanes: journey.level === 'L3' ? applyL3LaneVisibility(child.lanes) : child.lanes,
-        rootDocument: null,
-        activeBlueprintId: child.blueprint.id,
-        rootBlueprintId: current.rootBlueprintId ?? current.blueprint.id,
-      });
-      const nextDocument = cloneDocumentState({
-        ...activeChild,
-        rootDocument: current,
-        activeBlueprintId: activeChild.blueprint.id,
-        rootBlueprintId: current.rootBlueprintId ?? current.blueprint.id,
-      });
-      persist(nextDocument);
-      return {
-        ...s,
-        ...nextDocument,
-        selectedJourneySpanId: null,
-        selectedPolicyReformSpanId: null,
-        selectedProductTeamSpanId: null,
-        selectedCardId: null,
-      };
-    });
-  },
-
-  closeJourneyView: () => {
-    set((s) => {
-      if (!isChildJourneyOpen(s) || !s.rootDocument) return s;
-      const currentChild = cloneDocumentState(pickDocumentState(s));
-      const root = cloneDocumentState(s.rootDocument);
-      // Preserve the parent's own rootDocument so the L1→L2→L3 chain unwinds
-      // one level at a time (e.g. closing L3 restores L2, which still knows about L1).
-      const updatedRoot = cloneDocumentState({
-        ...root,
-        childBlueprints: upsertChildBlueprint(root, {
-          ...currentChild,
-          rootDocument: null,
-          activeBlueprintId: currentChild.blueprint.id,
-          rootBlueprintId: root.rootBlueprintId ?? root.blueprint.id,
-        }),
-        activeBlueprintId: root.blueprint.id,
-        rootBlueprintId: root.rootBlueprintId ?? root.blueprint.id,
-        rootDocument: root.rootDocument ?? null,
-      });
-      persist(updatedRoot);
-      return {
-        ...s,
-        ...updatedRoot,
-        selectedJourneySpanId: null,
-        selectedPolicyReformSpanId: null,
-        selectedProductTeamSpanId: null,
-        selectedCardId: null,
-      };
-    });
-  },
-
-  addPolicyReformSpan: (config) => {
-    let createdId: string | null = null;
-    set((s) => {
-      if (isChildJourneyOpen(s)) return s;
-      const current = cloneDocumentState(pickDocumentState(s));
-      if (current.steps.length === 0) return s;
-      const sortedSteps = [...current.steps].sort((a, b) => {
-        if (a.stageId === b.stageId) return a.order - b.order;
-        const stageA = current.stages.find((stage) => stage.id === a.stageId)?.order ?? 0;
-        const stageB = current.stages.find((stage) => stage.id === b.stageId)?.order ?? 0;
-        return stageA - stageB || a.order - b.order;
-      });
-      const defaultStep = sortedSteps[0];
-      const rawStartStep = config?.startStepId ? current.steps.find((step) => step.id === config.startStepId) ?? defaultStep : defaultStep;
-      const rawEndStep = config?.endStepId ? current.steps.find((step) => step.id === config.endStepId) ?? rawStartStep : rawStartStep;
-      const stepOrder = new Map(sortedSteps.map((step, index) => [step.id, index]));
-      const [startStep, endStep] =
-        (stepOrder.get(rawStartStep.id) ?? 0) <= (stepOrder.get(rawEndStep.id) ?? 0)
-          ? [rawStartStep, rawEndStep]
-          : [rawEndStep, rawStartStep];
-      const ts = now();
-      const span: PolicyReformSpan = {
-        id: uuid(),
-        blueprintId: current.blueprint.id,
-        title: config?.title?.trim() || 'Policy reform',
-        description: config?.description?.trim() ?? '',
-        startStepId: startStep.id,
-        endStepId: endStep.id,
-        order: current.policyReformSpans.length,
-        createdAt: ts,
-        updatedAt: ts,
-      };
-      createdId = span.id;
-      const nextDocument = cloneDocumentState({
-        ...current,
-        policyReformSpans: [...current.policyReformSpans, span],
-        blueprint: { ...current.blueprint, updatedAt: ts },
-      });
-      const nextPast = [...s._past, current].slice(-HISTORY_LIMIT);
-      persist(nextDocument);
-      return {
-        ...s,
-        ...nextDocument,
-        selectedPolicyReformSpanId: span.id,
-        selectedJourneySpanId: null,
-        selectedProductTeamSpanId: null,
-        selectedCardId: null,
-        _past: nextPast,
-        _future: [],
-        canUndo: nextPast.length > 0,
-        canRedo: false,
-      };
-    });
-    return createdId;
-  },
-
-  updatePolicyReformSpan: (id, patch) => {
-    set((s) => {
-      if (isChildJourneyOpen(s)) return s;
-      const current = cloneDocumentState(pickDocumentState(s));
-      const target = current.policyReformSpans.find((span) => span.id === id);
-      if (!target) return s;
-      const stepOrder = new Map(
-        [...current.steps]
-          .sort((a, b) => {
-            const stageA = current.stages.find((stage) => stage.id === a.stageId)?.order ?? 0;
-            const stageB = current.stages.find((stage) => stage.id === b.stageId)?.order ?? 0;
-            return stageA - stageB || a.order - b.order;
-          })
-          .map((step, index) => [step.id, index]),
-      );
-      const nextStart = patch.startStepId ?? target.startStepId;
-      const nextEnd = patch.endStepId ?? target.endStepId;
-      const normalizedPatch =
-        (stepOrder.get(nextStart) ?? 0) <= (stepOrder.get(nextEnd) ?? 0)
-          ? patch
-          : { ...patch, startStepId: nextEnd, endStepId: nextStart };
-      const nextDocument = cloneDocumentState({
-        ...current,
-        policyReformSpans: current.policyReformSpans.map((span) => span.id === id ? { ...span, ...normalizedPatch, updatedAt: now() } : span),
-        blueprint: { ...current.blueprint, updatedAt: now() },
-      });
-      if (isSameDocument(current, nextDocument)) return s;
-      const nextPast = [...s._past, current].slice(-HISTORY_LIMIT);
-      persist(nextDocument);
-      return {
-        ...s,
-        ...nextDocument,
-        _past: nextPast,
-        _future: [],
-        canUndo: nextPast.length > 0,
-        canRedo: false,
-      };
-    });
-  },
-
-  deletePolicyReformSpan: (id) => {
-    set((s) => {
-      if (isChildJourneyOpen(s)) return s;
-      const current = cloneDocumentState(pickDocumentState(s));
-      const target = current.policyReformSpans.find((span) => span.id === id);
-      if (!target) return s;
-      const nextDocument = cloneDocumentState({
-        ...current,
-        policyReformSpans: current.policyReformSpans.filter((span) => span.id !== id).map((span, index) => ({ ...span, order: index })),
-        blueprint: { ...current.blueprint, updatedAt: now() },
-      });
-      if (isSameDocument(current, nextDocument)) return s;
-      const nextPast = [...s._past, current].slice(-HISTORY_LIMIT);
-      persist(nextDocument);
-      return {
-        ...s,
-        ...nextDocument,
-        selectedPolicyReformSpanId: s.selectedPolicyReformSpanId === id ? null : s.selectedPolicyReformSpanId,
-        _past: nextPast,
-        _future: [],
-        canUndo: nextPast.length > 0,
-        canRedo: false,
-      };
-    });
-  },
-
-  addProductTeamSpan: (config) => {
-    let createdId: string | null = null;
-    set((s) => {
-      if (isChildJourneyOpen(s)) return s;
-      const current = cloneDocumentState(pickDocumentState(s));
-      if (current.steps.length === 0) return s;
-      const sortedSteps = [...current.steps].sort((a, b) => {
-        if (a.stageId === b.stageId) return a.order - b.order;
-        const stageA = current.stages.find((stage) => stage.id === a.stageId)?.order ?? 0;
-        const stageB = current.stages.find((stage) => stage.id === b.stageId)?.order ?? 0;
-        return stageA - stageB || a.order - b.order;
-      });
-      const defaultStep = sortedSteps[0];
-      const rawStartStep = config?.startStepId ? current.steps.find((step) => step.id === config.startStepId) ?? defaultStep : defaultStep;
-      const rawEndStep = config?.endStepId ? current.steps.find((step) => step.id === config.endStepId) ?? rawStartStep : rawStartStep;
-      const stepOrder = new Map(sortedSteps.map((step, index) => [step.id, index]));
-      const [startStep, endStep] =
-        (stepOrder.get(rawStartStep.id) ?? 0) <= (stepOrder.get(rawEndStep.id) ?? 0)
-          ? [rawStartStep, rawEndStep]
-          : [rawEndStep, rawStartStep];
-      const ts = now();
-      const span: ProductTeamSpan = {
-        id: uuid(),
-        blueprintId: current.blueprint.id,
-        title: config?.title?.trim() || 'Product team',
-        description: config?.description?.trim() ?? '',
-        startStepId: startStep.id,
-        endStepId: endStep.id,
-        order: (current.productTeamSpans ?? []).length,
-        createdAt: ts,
-        updatedAt: ts,
-      };
-      createdId = span.id;
-      const nextDocument = cloneDocumentState({
-        ...current,
-        productTeamSpans: [...(current.productTeamSpans ?? []), span],
-        blueprint: { ...current.blueprint, updatedAt: ts },
-      });
-      const nextPast = [...s._past, current].slice(-HISTORY_LIMIT);
-      persist(nextDocument);
-      return {
-        ...s,
-        ...nextDocument,
-        selectedProductTeamSpanId: span.id,
-        selectedJourneySpanId: null,
-        selectedPolicyReformSpanId: null,
-        selectedCardId: null,
-        _past: nextPast,
-        _future: [],
-        canUndo: nextPast.length > 0,
-        canRedo: false,
-      };
-    });
-    return createdId;
-  },
-
-  updateProductTeamSpan: (id, patch) => {
-    set((s) => {
-      if (isChildJourneyOpen(s)) return s;
-      const current = cloneDocumentState(pickDocumentState(s));
-      const target = (current.productTeamSpans ?? []).find((span) => span.id === id);
-      if (!target) return s;
-      const stepOrder = new Map(
-        [...current.steps]
-          .sort((a, b) => {
-            const stageA = current.stages.find((stage) => stage.id === a.stageId)?.order ?? 0;
-            const stageB = current.stages.find((stage) => stage.id === b.stageId)?.order ?? 0;
-            return stageA - stageB || a.order - b.order;
-          })
-          .map((step, index) => [step.id, index]),
-      );
-      const nextStart = patch.startStepId ?? target.startStepId;
-      const nextEnd = patch.endStepId ?? target.endStepId;
-      const normalizedPatch =
-        (stepOrder.get(nextStart) ?? 0) <= (stepOrder.get(nextEnd) ?? 0)
-          ? patch
-          : { ...patch, startStepId: nextEnd, endStepId: nextStart };
-      const nextDocument = cloneDocumentState({
-        ...current,
-        productTeamSpans: (current.productTeamSpans ?? []).map((span) => span.id === id ? { ...span, ...normalizedPatch, updatedAt: now() } : span),
-        blueprint: { ...current.blueprint, updatedAt: now() },
-      });
-      if (isSameDocument(current, nextDocument)) return s;
-      const nextPast = [...s._past, current].slice(-HISTORY_LIMIT);
-      persist(nextDocument);
-      return {
-        ...s,
-        ...nextDocument,
-        _past: nextPast,
-        _future: [],
-        canUndo: nextPast.length > 0,
-        canRedo: false,
-      };
-    });
-  },
-
-  deleteProductTeamSpan: (id) => {
-    set((s) => {
-      if (isChildJourneyOpen(s)) return s;
-      const current = cloneDocumentState(pickDocumentState(s));
-      const target = (current.productTeamSpans ?? []).find((span) => span.id === id);
-      if (!target) return s;
-      const nextDocument = cloneDocumentState({
-        ...current,
-        productTeamSpans: (current.productTeamSpans ?? []).filter((span) => span.id !== id).map((span, index) => ({ ...span, order: index })),
-        blueprint: { ...current.blueprint, updatedAt: now() },
-      });
-      if (isSameDocument(current, nextDocument)) return s;
-      const nextPast = [...s._past, current].slice(-HISTORY_LIMIT);
-      persist(nextDocument);
-      return {
-        ...s,
-        ...nextDocument,
-        selectedProductTeamSpanId: s.selectedProductTeamSpanId === id ? null : s.selectedProductTeamSpanId,
-        _past: nextPast,
-        _future: [],
-        canUndo: nextPast.length > 0,
-        canRedo: false,
-      };
-    });
-  },
-
   // Cards
   addCard: (stepId, laneKey, title, body = '', tags = []) => {
     set((s) => {
@@ -2658,30 +1927,6 @@ export const useBlueprintStore = create<BlueprintStore>((set, get) => ({
   selectCard: (id) => set((s) => ({
     ...s,
     selectedCardId: id,
-    selectedJourneySpanId: id ? null : s.selectedJourneySpanId,
-    selectedPolicyReformSpanId: id ? null : s.selectedPolicyReformSpanId,
-    selectedProductTeamSpanId: id ? null : s.selectedProductTeamSpanId,
-  })),
-  selectJourneySpan: (id) => set((s) => ({
-    ...s,
-    selectedJourneySpanId: id,
-    selectedPolicyReformSpanId: id ? null : s.selectedPolicyReformSpanId,
-    selectedProductTeamSpanId: id ? null : s.selectedProductTeamSpanId,
-    selectedCardId: id ? null : s.selectedCardId,
-  })),
-  selectPolicyReformSpan: (id) => set((s) => ({
-    ...s,
-    selectedPolicyReformSpanId: id,
-    selectedJourneySpanId: id ? null : s.selectedJourneySpanId,
-    selectedProductTeamSpanId: id ? null : s.selectedProductTeamSpanId,
-    selectedCardId: id ? null : s.selectedCardId,
-  })),
-  selectProductTeamSpan: (id) => set((s) => ({
-    ...s,
-    selectedProductTeamSpanId: id,
-    selectedJourneySpanId: id ? null : s.selectedJourneySpanId,
-    selectedPolicyReformSpanId: id ? null : s.selectedPolicyReformSpanId,
-    selectedCardId: id ? null : s.selectedCardId,
   })),
 
   // Card links
@@ -3247,23 +2492,10 @@ export const useBlueprintStore = create<BlueprintStore>((set, get) => ({
   },
 
   // OST panel (ephemeral)
-  setOstPanelOpen: (open) => set((s) => ({
-    ...s,
-    ostPanelOpen: open,
-    // Clear ephemeral OST sub-state when the OST closes so it doesn't pop
-    // back open the next time the user opens the OST.
-    spineFilter: open ? s.spineFilter : null,
-    contributionPathOppId: open ? s.contributionPathOppId : null,
-  })),
-  setOstViewMode: (mode) => set((s) => ({ ...s, ostViewMode: mode })),
-  setSpineFilter: (filter) => set((s) => ({ ...s, spineFilter: filter })),
-  setContributionPathOppId: (id) => set((s) => ({ ...s, contributionPathOppId: id })),
 
   // Strategic alignment overlay (ephemeral)
-  setStrategicAlignmentOpen: (open) => set((s) => ({ ...s, strategicAlignmentOpen: open })),
 
   // Opportunities panel (ephemeral)
-  setOpportunitiesPanelOpen: (open) => set((s) => ({ ...s, opportunitiesPanelOpen: open })),
 
   // Helpers
   getPersistableDocument: () => coercePersistedRootPointers(toPersistableSnapshot(pickDocumentState(get()))),

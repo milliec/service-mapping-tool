@@ -5,8 +5,6 @@ import { useBlueprintStore } from '@/store/blueprint-store';
 import { BoardToolbar } from '@/components/board/BoardToolbar';
 import { Board } from '@/components/board/Board';
 import { EmptyState } from '@/components/board/EmptyState';
-import { OpportunitySolutionTree } from '@/components/board/OpportunitySolutionTree';
-import { StrategicAlignment } from '@/components/board/StrategicAlignment';
 import { AiImportDialog } from '@/components/import/AiImportDialog';
 
 const STAGE_MRF_TITLE_PREVIOUS = 'MRFs separate material streams and pre-treatment';
@@ -32,8 +30,6 @@ export default function Home() {
   const hydrated = useBlueprintStore((s) => s._hydrated);
   const stages = useBlueprintStore((s) => s.stages);
   const updateStage = useBlueprintStore((s) => s.updateStage);
-  const ostPanelOpen = useBlueprintStore((s) => s.ostPanelOpen);
-  const strategicAlignmentOpen = useBlueprintStore((s) => s.strategicAlignmentOpen);
 
   const [showImport, setShowImport] = useState(false);
 
@@ -84,8 +80,6 @@ export default function Home() {
         <Board />
       )}
       <AiImportDialog open={showImport} onClose={() => setShowImport(false)} />
-      {ostPanelOpen && <OpportunitySolutionTree />}
-      {strategicAlignmentOpen && <StrategicAlignment />}
     </div>
   );
 }

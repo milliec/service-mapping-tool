@@ -14,8 +14,6 @@ import {
   Save,
   Target,
   Sparkles,
-  GitBranch,
-  ArrowLeft,
   Share2,
   Check,
   AlertCircle,
@@ -28,7 +26,6 @@ import { getLaneTitle, L1_HIDDEN_LANE_KEYS, L2_LANE_KEYS, L2_LANE_TITLE_OVERRIDE
 import { useLibraryStore } from '@/store/library-store';
 import { exportMarkdown } from '@/lib/export-markdown';
 import { blueprintTitleLabel } from '@/lib/blueprint-title';
-import { getActiveBlueprintJourneyLevel } from '@/lib/blueprint-levels';
 import type { Card, Opportunity } from '@/lib/types';
 
 const SHOW_EXAMPLE_TREE_MENU_ITEM = false;
@@ -74,9 +71,6 @@ export function BoardToolbar({ onImport }: BoardToolbarProps = {}) {
   const steps = useBlueprintStore((s) => s.steps);
   const lanes = useBlueprintStore((s) => s.lanes);
   const cards = useBlueprintStore((s) => s.cards);
-  const journeySpans = useBlueprintStore((s) => s.journeySpans);
-  const policyReformSpans = useBlueprintStore((s) => s.policyReformSpans);
-  const productTeamSpans = useBlueprintStore((s) => s.productTeamSpans ?? []);
   const childBlueprints = useBlueprintStore((s) => s.childBlueprints);
   const activeBlueprintId = useBlueprintStore((s) => s.activeBlueprintId);
   const rootBlueprintId = useBlueprintStore((s) => s.rootBlueprintId);
@@ -91,9 +85,6 @@ export function BoardToolbar({ onImport }: BoardToolbarProps = {}) {
   const toggleLane = useBlueprintStore((s) => s.toggleLane);
   const toggleStoryboardVisible = useBlueprintStore((s) => s.toggleStoryboardVisible);
   const newBlueprint = useBlueprintStore((s) => s.newBlueprint);
-  const loadExampleOst = useBlueprintStore((s) => s.loadExampleOst);
-  const loadDefraOst = useBlueprintStore((s) => s.loadDefraOst);
-  const closeJourneyView = useBlueprintStore((s) => s.closeJourneyView);
   const undo = useBlueprintStore((s) => s.undo);
   const redo = useBlueprintStore((s) => s.redo);
   const canUndo = useBlueprintStore((s) => s.canUndo);
@@ -107,52 +98,16 @@ export function BoardToolbar({ onImport }: BoardToolbarProps = {}) {
   const requirements = useBlueprintStore((s) => s.requirements);
   const apiContracts = useBlueprintStore((s) => s.apiContracts);
   const uiScaffolds = useBlueprintStore((s) => s.uiScaffolds);
-  const setOpportunitiesPanelOpen = useBlueprintStore((s) => s.setOpportunitiesPanelOpen);
-  const opportunitiesPanelOpen = useBlueprintStore((s) => s.opportunitiesPanelOpen);
-  const setOstPanelOpen = useBlueprintStore((s) => s.setOstPanelOpen);
   const readOnly = useBlueprintStore((s) => s.readOnly);
 
   const entries = useLibraryStore((s) => s.entries);
   const hydrateLibrary = useLibraryStore((s) => s.hydrate);
   const saveToLibrary = useLibraryStore((s) => s.save);
 
-  const LEVEL_LABELS: Record<'L1' | 'L2' | 'L3', string> = { L1: 'Lifecycle', L2: 'Macro', L3: 'Micro' };
   const isChildView = Boolean(rootDocument && activeBlueprintId !== rootBlueprintId);
-  const activeJourneyLevel = getActiveBlueprintJourneyLevel({
-    blueprint,
-    stages,
-    steps,
-    lanes,
-    journeySpans,
-    policyReformSpans,
-    productTeamSpans,
-    childBlueprints,
-    rootDocument,
-    activeBlueprintId,
-    rootBlueprintId,
-    cards,
-    storyboardImages,
-    storyboardVisible,
-    storyboardCollapsed,
-    cardLinks,
-    evidence,
-    opportunities,
-    solutions,
-    assumptions,
-    strategicGoals,
-    outcomes,
-    systemOutcomes: [],
-    behaviourOutcomes: [],
-    serviceOutcomes: [],
-    stepLinks,
-    requirements,
-    apiContracts,
-    uiScaffolds,
-    traceabilityCounters,
-  });
-  const levelLabel = isChildView ? LEVEL_LABELS[activeJourneyLevel] : 'Lifecycle';
-  const isL2Mode = isChildView && activeJourneyLevel === 'L2';
-  const isL3Mode = isChildView && activeJourneyLevel === 'L3';
+  const levelLabel = 'Lifecycle';
+  const isL2Mode = false;
+  const isL3Mode = false;
 
   // Show only the lanes relevant to the current view level.
   const dropdownLanes = isL3Mode
@@ -314,15 +269,6 @@ export function BoardToolbar({ onImport }: BoardToolbarProps = {}) {
       <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-neutral-200 bg-white px-5 py-3">
         {/* Blueprint name */}
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          {rootDocument && (
-            <button
-              onClick={closeJourneyView}
-              className="inline-flex h-[34px] shrink-0 items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 text-[13px] font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Back
-            </button>
-          )}
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <span className="w-fit rounded-full bg-[#E6F3EB] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#008938]">
               {levelLabel}
@@ -484,28 +430,6 @@ export function BoardToolbar({ onImport }: BoardToolbarProps = {}) {
             )}
           </div>
 
-          <button
-            onClick={() => setOpportunitiesPanelOpen(!opportunitiesPanelOpen)}
-            disabled={contextualOpportunityCount === 0}
-            aria-pressed={opportunitiesPanelOpen}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400',
-              contextualOpportunityCount === 0
-                ? 'cursor-not-allowed border-neutral-200 bg-neutral-50 text-neutral-300 shadow-none'
-                : opportunitiesPanelOpen
-                ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100'
-                : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50',
-            )}
-          >
-            <Target aria-hidden="true" className="h-3.5 w-3.5" />
-            Opportunities
-            {contextualOpportunityCount > 0 && (
-              <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-bold text-white">
-                {contextualOpportunityCount}
-              </span>
-            )}
-          </button>
-
           <div className="relative">
             <button
               ref={menuTriggerRef}
@@ -563,45 +487,6 @@ export function BoardToolbar({ onImport }: BoardToolbarProps = {}) {
                       className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                     >
                       <BookOpen aria-hidden="true" className="h-3.5 w-3.5" /> Library
-                    </button>
-                  )}
-                  {SHOW_NEW_OPPORTUNITY_TREE_MENU_ITEM && (
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        useBlueprintStore.getState().resetOpportunityTree();
-                        setShowMenu(false);
-                      }}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-                    >
-                      <GitBranch aria-hidden="true" className="h-3.5 w-3.5" /> New opportunity tree
-                    </button>
-                  )}
-                  {/* Hidden for now; keep the implementation available to restore later. */}
-                  {SHOW_EXAMPLE_TREE_MENU_ITEM && !readOnly && (
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        loadExampleOst();
-                        setOstPanelOpen(true);
-                        setShowMenu(false);
-                      }}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-                    >
-                      <GitBranch aria-hidden="true" className="h-3.5 w-3.5" /> Example tree
-                    </button>
-                  )}
-                  {!readOnly && (
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        loadDefraOst();
-                        setOstPanelOpen(true);
-                        setShowMenu(false);
-                      }}
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] font-medium text-neutral-700 transition-colors hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-                    >
-                      <GitBranch aria-hidden="true" className="h-3.5 w-3.5" /> Defra opportunity tree
                     </button>
                   )}
                   {!readOnly && (

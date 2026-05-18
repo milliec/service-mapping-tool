@@ -25,21 +25,10 @@ import { StepHeader } from './StepHeader';
 import { BlueprintCard } from './BlueprintCard';
 import { StoryboardCell } from './StoryboardCell';
 import { CardDetailPanel } from './CardDetailPanel';
-import { JourneySpanDetailPanel } from './JourneySpanDetailPanel';
-import { CreateJourneyDialog } from './CreateJourneyDialog';
-import { CreatePolicyReformDialog } from './CreatePolicyReformDialog';
-import { CreateProductTeamDialog } from './CreateProductTeamDialog';
-import { OpportunitiesPanel } from './OpportunitiesPanel';
-import { JourneySpanRow } from './JourneySpanRow';
-import { PolicyReformRow } from './PolicyReformRow';
-import { ProductTeamSpanRow } from './ProductTeamSpanRow';
-import { PolicyReformDetailPanel } from './PolicyReformDetailPanel';
-import { ProductTeamDetailPanel } from './ProductTeamDetailPanel';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { DEFAULT_LANES, L2_LANE_KEYS, L2_LANE_TITLE_OVERRIDES, L3_LANE_KEYS, L3_LANE_TITLE_OVERRIDES, L1_MACRO_LANE_KEYS } from '@/lib/lane-definitions';
 import { BOARD_STEP_WIDTH } from '@/lib/board-layout';
-import { getActiveBlueprintJourneyLevel } from '@/lib/blueprint-levels';
 
 const FRONTSTAGE_BOUNDARY_KEY = 'frontstage_touchpoint';
 
@@ -174,26 +163,12 @@ export function Board() {
   const updateStage = useBlueprintStore((s) => s.updateStage);
   const lanes = useBlueprintStore((s) => s.lanes);
   const cards = useBlueprintStore((s) => s.cards);
-  const journeySpans = useBlueprintStore((s) => s.journeySpans);
-  const policyReformSpans = useBlueprintStore((s) => s.policyReformSpans);
-  const productTeamSpans = useBlueprintStore((s) => s.productTeamSpans ?? []);
-  const selectProductTeamSpan = useBlueprintStore((s) => s.selectProductTeamSpan);
-  const selectedProductTeamSpanId = useBlueprintStore((s) => s.selectedProductTeamSpanId);
   const rootDocument = useBlueprintStore((s) => s.rootDocument);
   const activeBlueprintId = useBlueprintStore((s) => s.activeBlueprintId);
   const rootBlueprintId = useBlueprintStore((s) => s.rootBlueprintId);
   const moveCard = useBlueprintStore((s) => s.moveCard);
   const reorderCard = useBlueprintStore((s) => s.reorderCard);
   const toggleLaneCollapsed = useBlueprintStore((s) => s.toggleLaneCollapsed);
-  const addJourneySpan = useBlueprintStore((s) => s.addJourneySpan);
-  const openJourneySpan = useBlueprintStore((s) => s.openJourneySpan);
-  const hydrateJourneyChildFromLibraryIfMissing = useBlueprintStore(
-    (s) => s.hydrateJourneyChildFromLibraryIfMissing,
-  );
-  const selectJourneySpan = useBlueprintStore((s) => s.selectJourneySpan);
-  const selectedJourneySpanId = useBlueprintStore((s) => s.selectedJourneySpanId);
-  const selectPolicyReformSpan = useBlueprintStore((s) => s.selectPolicyReformSpan);
-  const selectedPolicyReformSpanId = useBlueprintStore((s) => s.selectedPolicyReformSpanId);
   const storyboardImages = useBlueprintStore((s) => s.storyboardImages);
   const storyboardVisible = useBlueprintStore((s) => s.storyboardVisible);
   const storyboardCollapsed = useBlueprintStore((s) => s.storyboardCollapsed);
@@ -202,12 +177,6 @@ export function Board() {
   const removeStoryboardImage = useBlueprintStore((s) => s.removeStoryboardImage);
   const toggleStoryboardCollapsed = useBlueprintStore((s) => s.toggleStoryboardCollapsed);
   const selectCard = useBlueprintStore((s) => s.selectCard);
-
-  const opportunitiesPanelOpen = useBlueprintStore((s) => s.opportunitiesPanelOpen);
-
-  const [createJourneyOpen, setCreateJourneyOpen] = useState(false);
-  const [createPolicyReformOpen, setCreatePolicyReformOpen] = useState(false);
-  const [createProductTeamOpen, setCreateProductTeamOpen] = useState(false);
 
   const [activeCard, setActiveCard] = useState<Card | null>(null);
   const [panMode, setPanMode] = useState(false);
@@ -222,8 +191,6 @@ export function Board() {
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
   const boardRootRef = useRef<HTMLDivElement>(null);
-  const journeyReturnStateRef = useRef<{ journeyId: string | null; scrollLeft: number; scrollTop: number } | null>(null);
-  const wasChildJourneyOpenRef = useRef(false);
 
   // Right-panel row refs for height measurement
   const rightStageRowRef = useRef<HTMLDivElement>(null);
@@ -354,40 +321,8 @@ export function Board() {
   const isChildView = Boolean(
     rootDocument && activeBlueprintId !== rootBlueprintId,
   );
-  const activeJourneyLevel = getActiveBlueprintJourneyLevel({
-    blueprint: useBlueprintStore.getState().blueprint,
-    stages,
-    steps,
-    lanes,
-    journeySpans,
-    policyReformSpans,
-    productTeamSpans,
-    childBlueprints: useBlueprintStore.getState().childBlueprints,
-    rootDocument,
-    activeBlueprintId,
-    rootBlueprintId,
-    cards,
-    storyboardImages,
-    storyboardVisible,
-    storyboardCollapsed,
-    cardLinks: useBlueprintStore.getState().cardLinks,
-    evidence: useBlueprintStore.getState().evidence,
-    opportunities: useBlueprintStore.getState().opportunities,
-    solutions: useBlueprintStore.getState().solutions,
-    assumptions: useBlueprintStore.getState().assumptions,
-    strategicGoals: useBlueprintStore.getState().strategicGoals,
-    outcomes: useBlueprintStore.getState().outcomes,
-    systemOutcomes: useBlueprintStore.getState().systemOutcomes ?? [],
-    behaviourOutcomes: useBlueprintStore.getState().behaviourOutcomes ?? [],
-    serviceOutcomes: useBlueprintStore.getState().serviceOutcomes ?? [],
-    stepLinks: useBlueprintStore.getState().stepLinks,
-    requirements: useBlueprintStore.getState().requirements,
-    apiContracts: useBlueprintStore.getState().apiContracts,
-    uiScaffolds: useBlueprintStore.getState().uiScaffolds,
-    traceabilityCounters: useBlueprintStore.getState().traceabilityCounters,
-  });
-  const isL2Mode = isChildView && activeJourneyLevel === 'L2';
-  const isL3Mode = isChildView && activeJourneyLevel === 'L3';
+  const isL2Mode = false;
+  const isL3Mode = false;
 
   const isL1MacroMode = useMemo(
     () => lanes.some((l) => L1_MACRO_LANE_KEYS.has(l.key)),
@@ -552,9 +487,8 @@ export function Board() {
     // Deselect card when clicking on the blank canvas
     if (!(event.target as HTMLElement).closest('[data-board-card], [data-no-select]')) {
       selectCard(null);
-      selectJourneySpan(null);
     }
-  }, [focusBoardSurface, selectCard, selectJourneySpan]);
+  }, [focusBoardSurface, selectCard]);
 
   const handleBoardKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     if (isBoardInteractiveTarget(event.target)) return;
@@ -681,42 +615,14 @@ export function Board() {
     [cards, getCardsForCell, moveCard, reorderCard],
   );
 
-  const isChildJourneyOpen = Boolean(rootDocument && activeBlueprintId && rootBlueprintId && activeBlueprintId !== rootBlueprintId);
-
-  const handleOpenJourney = useCallback(
-    (journeyId: string) => {
-      const journey = useBlueprintStore.getState().journeySpans.find((j) => j.id === journeyId);
-      if (journey) {
-        hydrateJourneyChildFromLibraryIfMissing(journey.childBlueprintId);
-      }
-      const beforeActive = useBlueprintStore.getState().activeBlueprintId;
-      const panel = rightPanelRef.current;
-      journeyReturnStateRef.current = {
-        journeyId,
-        scrollLeft: panel?.scrollLeft ?? 0,
-        scrollTop: panel?.scrollTop ?? 0,
-      };
-      openJourneySpan(journeyId);
-      const afterActive = useBlueprintStore.getState().activeBlueprintId;
-      if (beforeActive === afterActive) {
-        selectJourneySpan(journeyId);
-      }
-    },
-    [hydrateJourneyChildFromLibraryIfMissing, openJourneySpan, selectJourneySpan],
-  );
-
-  // Reset scroll to the first stage / first step whenever the active blueprint
-  // changes (any level jump: L1↔L2↔L3, or between sibling L2s via the library).
+  // Reset scroll when the active blueprint changes.
   useEffect(() => {
     const rightPanel = rightPanelRef.current;
     const leftPanel = leftPanelRef.current;
     rightPanel?.scrollTo({ left: 0, top: 0 });
     if (leftPanel) leftPanel.scrollTop = 0;
     focusBoardSurface();
-    // Clear any stale return-state so nothing restores behind our back.
-    journeyReturnStateRef.current = null;
-    wasChildJourneyOpenRef.current = isChildJourneyOpen;
-  }, [activeBlueprintId, focusBoardSurface, isChildJourneyOpen]);
+  }, [activeBlueprintId, focusBoardSurface]);
 
   if (sortedStages.length === 0) return null;
 
@@ -1095,8 +1001,7 @@ export function Board() {
             )}
             </div>
 
-            {/* Lane rows — cells only, no label (label is in left panel).
-               user_journey lane renders JourneySpanRow instead of normal cells. */}
+            {/* Lane rows — cells only, no label (label is in left panel). */}
             {effectiveVisibleLanes.map((lane, laneIdx) => {
               const isAfterVisibility =
                 lineOfVisibilityIndex >= 0 && laneIdx === lineOfVisibilityIndex + 1;
@@ -1118,40 +1023,7 @@ export function Board() {
                       lane.collapsed && 'bg-neutral-50/80',
                     )}
                   >
-                    {lane.key === 'user_journey' ? (
-                      <JourneySpanRow
-                        collapsed={lane.collapsed}
-                        stages={sortedStages}
-                        stepsPerStage={stepsPerStage}
-                        journeySpans={journeySpans}
-                        selectedJourneySpanId={selectedJourneySpanId}
-                        journeyRowTitle={isL2Mode ? 'Service or product' : 'Nested journey'}
-                        isL2Mode={isL2Mode}
-                        onAdd={() => setCreateJourneyOpen(true)}
-                        onOpen={handleOpenJourney}
-                        onEdit={selectJourneySpan}
-                      />
-                    ) : lane.key === 'policy_reform' ? (
-                      <PolicyReformRow
-                        collapsed={lane.collapsed}
-                        stages={sortedStages}
-                        stepsPerStage={stepsPerStage}
-                        policyReformSpans={policyReformSpans}
-                        selectedPolicyReformSpanId={selectedPolicyReformSpanId}
-                        onAdd={() => setCreatePolicyReformOpen(true)}
-                        onEdit={selectPolicyReformSpan}
-                      />
-                    ) : lane.key === 'product_teams' ? (
-                      <ProductTeamSpanRow
-                        collapsed={lane.collapsed}
-                        stages={sortedStages}
-                        stepsPerStage={stepsPerStage}
-                        productTeamSpans={productTeamSpans}
-                        selectedProductTeamSpanId={selectedProductTeamSpanId}
-                        onAdd={() => setCreateProductTeamOpen(true)}
-                        onEdit={selectProductTeamSpan}
-                      />
-                    ) : lane.collapsed
+                    {lane.collapsed
                       ? sortedStages.map((stage) => {
                           const stageSteps = stepsPerStage.get(stage.id) || [];
                           if (stageSteps.length === 0) {
@@ -1220,16 +1092,7 @@ export function Board() {
           </div>
         </div>
 
-        {/* Panels: opportunities (mutually exclusive with card detail) */}
-        {opportunitiesPanelOpen ? <OpportunitiesPanel /> : selectedJourneySpanId ? <JourneySpanDetailPanel onOpenJourney={handleOpenJourney} /> : selectedPolicyReformSpanId ? <PolicyReformDetailPanel /> : selectedProductTeamSpanId ? <ProductTeamDetailPanel /> : <CardDetailPanel />}
-
-        <CreateJourneyDialog
-          open={createJourneyOpen}
-          onClose={() => setCreateJourneyOpen(false)}
-          isL2Mode={isL2Mode}
-        />
-        <CreatePolicyReformDialog open={createPolicyReformOpen} onClose={() => setCreatePolicyReformOpen(false)} />
-        <CreateProductTeamDialog open={createProductTeamOpen} onClose={() => setCreateProductTeamOpen(false)} />
+        <CardDetailPanel />
 
         <div
           data-no-pan

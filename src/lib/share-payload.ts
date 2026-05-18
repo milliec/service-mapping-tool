@@ -171,21 +171,6 @@ function clipTraceabilityProse(doc: BlueprintState, scale: number): BlueprintSta
       ...st,
       title: clip(st.title, L(2000)),
     }));
-    x.journeySpans = (x.journeySpans ?? []).map((j) => ({
-      ...j,
-      title: clip(j.title, L(2000)),
-      description: j.description ? clip(j.description, L(8000)) : j.description,
-    }));
-    x.policyReformSpans = (x.policyReformSpans ?? []).map((j) => ({
-      ...j,
-      title: clip(j.title, L(2000)),
-      description: j.description ? clip(j.description, L(8000)) : j.description,
-    }));
-    x.productTeamSpans = (x.productTeamSpans ?? []).map((j) => ({
-      ...j,
-      title: clip(j.title, L(2000)),
-      description: j.description ? clip(j.description, L(8000)) : j.description,
-    }));
     for (const ch of x.childBlueprints ?? []) walk(ch);
   };
   walk(d);

@@ -491,7 +491,6 @@ export function CardDetailPanel() {
   const evidence = useBlueprintStore((s) => s.evidence);
   const opportunities = useBlueprintStore((s) => s.opportunities);
   const updateCard = useBlueprintStore((s) => s.updateCard);
-  const setOpportunitiesPanelOpen = useBlueprintStore((s) => s.setOpportunitiesPanelOpen);
   const readOnly = useBlueprintStore((s) => s.readOnly);
 
   const requirements = useBlueprintStore((s) => s.requirements);
@@ -808,14 +807,13 @@ export function CardDetailPanel() {
             <section>
               <SectionHeader
                 label="Opportunities"
-                action={{ label: 'View all', icon: <Target aria-hidden="true" className="h-3 w-3" />, onClick: () => setOpportunitiesPanelOpen(true) }}
               />
               <div className="space-y-2">
                 {linkedOpportunities.map((opp) => (
                   <LinkedOpportunityRow
                     key={opp.id}
                     opportunity={opp}
-                    onOpenPanel={() => setOpportunitiesPanelOpen(true)}
+                    onOpenPanel={() => {}}
                   />
                 ))}
               </div>

@@ -1,6 +1,6 @@
 import type { BlueprintState } from '@/lib/types';
 
-/** Walk upward to the lifecycle (L1) root so library rows don’t recurse infinitely via rootDocument ↔ childBlueprints. */
+/** Walk upward to the lifecycle (L1) root so library rows don't recurse infinitely via rootDocument ↔ childBlueprints. */
 function getCanonicalRootState(state: BlueprintState): BlueprintState {
   const seen = new Set<string>();
   let current: BlueprintState = state;
@@ -21,82 +21,20 @@ function getCanonicalRootState(state: BlueprintState): BlueprintState {
 }
 
 /**
- * Walk `rootDocument` from the in-memory focus (`state`); parent docs always
- * hold `journeySpans` to their open child, while `childBlueprints` on
- * higher ancestors can be stale (e.g. L1’s embedded L2 missing L3 after drill-in).
- */
-function findJourneyLevelViaParentChain(
-  state: BlueprintState,
-  targetChildBlueprintId: string,
-): 'L1' | 'L2' | 'L3' | null {
-  const seen = new Set<string>();
-  let current: BlueprintState | null = state;
-  while (current) {
-    const bid = current.blueprint?.id;
-    if (bid) {
-      if (seen.has(bid)) break;
-      seen.add(bid);
-    }
-    for (const span of current.journeySpans ?? []) {
-      if (span.childBlueprintId === targetChildBlueprintId) {
-        return span.level;
-      }
-    }
-    current = current.rootDocument ?? null;
-  }
-  return null;
-}
-
-const findSpanLevelInChildBlueprintTree = (
-  doc: BlueprintState,
-  targetChildBlueprintId: string,
-  visited: Set<string> = new Set(),
-): 'L1' | 'L2' | 'L3' | null => {
-  const bid = doc.blueprint?.id;
-  if (bid) {
-    if (visited.has(bid)) return null;
-    visited.add(bid);
-  }
-  for (const span of doc.journeySpans ?? []) {
-    if (span.childBlueprintId === targetChildBlueprintId) {
-      return span.level;
-    }
-  }
-  for (const child of doc.childBlueprints ?? []) {
-    const found = findSpanLevelInChildBlueprintTree(child, targetChildBlueprintId, visited);
-    if (found) return found;
-  }
-  return null;
-};
-
-/**
  * Journey level for the blueprint this library row represents (`entry.id`),
  * not every level that appears anywhere under the lifecycle root.
  */
 export function getLibraryEntryJourneyLevel(
-  state: BlueprintState,
-  entryBlueprintId: string,
+  _state: BlueprintState,
+  _entryBlueprintId: string,
 ): 'L1' | 'L2' | 'L3' {
-  const root = getCanonicalRootState(state);
-  if (entryBlueprintId === root.blueprint?.id) {
-    return 'L1';
-  }
-
-  const fromChain = findJourneyLevelViaParentChain(state, entryBlueprintId);
-  if (fromChain) {
-    return fromChain;
-  }
-
-  return findSpanLevelInChildBlueprintTree(root, entryBlueprintId) ?? 'L1';
+  return 'L1';
 }
 
 export function getActiveBlueprintJourneyLevel(
-  state: BlueprintState,
+  _state: BlueprintState,
 ): 'L1' | 'L2' | 'L3' {
-  return getLibraryEntryJourneyLevel(
-    state,
-    state.activeBlueprintId ?? state.blueprint?.id ?? '',
-  );
+  return 'L1';
 }
 
 /** Lifecycle root blueprint id for a snapshot (used to match library rows to the open document). */
