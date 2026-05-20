@@ -29,7 +29,6 @@
 import { v4 as uuid } from 'uuid';
 import { LANE_KEYS, type LaneKey } from '../types';
 import type { ExtractedRow } from './extract';
-import type { ImportMappingService } from './mapping-service';
 import type { MappedRow, MappingResult, RowRecordType } from './mapping-types';
 
 // ---------------------------------------------------------------------------
@@ -287,7 +286,7 @@ function inferStageAndStep(
 // Service implementation
 // ---------------------------------------------------------------------------
 
-export class MockImportMappingService implements ImportMappingService {
+export class MockImportMappingService {
   async mapRows(rows: ExtractedRow[]): Promise<MappingResult> {
     if (rows.length === 0) {
       return { rows: [], errors: ['No rows to map'], warnings: [] };
