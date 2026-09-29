@@ -27,27 +27,6 @@ src/
 └── store/                — Zustand blueprint store
 ```
 
-## Deploying to Heroku
-
-**1. Create the app**
-```bash
-heroku create your-app-name
-```
-
-**2. Set the password**
-
-This activates the password gate — anyone visiting the URL will get a browser login prompt. They can enter any username but must use this exact password.
-```bash
-heroku config:set PREVIEW_PASSWORD=yourchosenpassword
-```
-
-**3. Push to deploy**
-```bash
-git push heroku main
-```
-
-> `middleware.ts` handles the password gate. When `PREVIEW_PASSWORD` is set, every page requires authentication. If the env var is not set (e.g. locally), all traffic passes through freely. No code changes needed.
-
 ---
 
-Created and designed by Millie Chan.
+Created and designed by Millie Chan, May 2026.
