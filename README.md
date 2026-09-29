@@ -1,4 +1,4 @@
-# Service Blueprint Tool
+# Service Mapping Tool
 
 Gives cross-functional teams a shared canvas to map what users do, what the service does, and what's happening behind the scenes — across stages, steps, and swimlanes (L1 macro → L2 journey → L3 product detail). Pain points, needs, and system constraints are visible in the same view, so nothing gets siloed in a slide deck or across multiple mural boards.
 
